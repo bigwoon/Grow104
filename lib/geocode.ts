@@ -13,7 +13,7 @@ export const geocodeAddress = async (address: string): Promise<{ latitude: numbe
 
     try {
         const response = await fetch(url);
-        const data = await response.json();
+        const data: any = await response.json();
 
         if (data.status === 'OK' && data.results?.[0]) {
             const { lat, lng } = data.results[0].geometry.location;
@@ -48,7 +48,7 @@ export const reverseGeocode = async (latitude: number, longitude: number): Promi
 
     try {
         const response = await fetch(url);
-        const data = await response.json();
+        const data: any = await response.json();
 
         if (data.status === 'OK' && data.results?.[0]) {
             return data.results[0].formatted_address;
