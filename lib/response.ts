@@ -1,14 +1,35 @@
 /**
+ * Get CORS origin based on request
+ * Allows production domain and localhost for development
+ */
+const getAllowedOrigin = (origin?: string): string => {
+    const allowedOrigins = [
+        'https://grow104.org',
+        'http://localhost:3000',
+        'http://localhost:5173',
+        'http://localhost:5174'
+    ];
+
+    if (origin && allowedOrigins.includes(origin)) {
+        return origin;
+    }
+
+    // Default to production domain
+    return 'https://grow104.org';
+};
+
+/**
  * Standardized success response
  */
-export const successResponse = (data: any, message?: string) => {
+export const successResponse = (data: any, message?: string, origin?: string) => {
     return {
         statusCode: 200,
         headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': getAllowedOrigin(origin),
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Allow-Credentials': 'true'
         },
         body: JSON.stringify({
             success: true,
@@ -21,14 +42,15 @@ export const successResponse = (data: any, message?: string) => {
 /**
  * Standardized error response
  */
-export const errorResponse = (error: string, statusCode: number = 500) => {
+export const errorResponse = (error: string, statusCode: number = 500, origin?: string) => {
     return {
         statusCode,
         headers: {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
+            'Access-Control-Allow-Origin': getAllowedOrigin(origin),
             'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Allow-Credentials': 'true'
         },
         body: JSON.stringify({
             success: false,
@@ -59,7 +81,10 @@ export const handleError = (error: any) => {
             statusCode: 409,
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
+                'Access-Control-Allow-Origin': getAllowedOrigin(),
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Allow-Credentials': 'true'
             },
             body: JSON.stringify({
                 success: false,
