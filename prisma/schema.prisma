@@ -1,0 +1,351 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// USER MANAGEMENT
+// ============================================
+
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  role      String   // 'Admin', 'Gardener', 'Volunteer'
+  avatarUrl String?
+  zipcode   String?
+  phone     String?
+  address   String?
+  
+  // Additional fields
+  growing   String[] @default([])  // Gardener crops list
+  isOnline  Boolean  @default(false)
+  isActive  Boolean  @default(true)
+  lastSeen  DateTime @default(now())
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ownedGardens              Garden[]              @relation("GardenOwner")
+  gardenGardeners           GardenGardener[]
+  gardenVolunteers          GardenVolunteer[]
+  sentMessages              Message[]             @relation("SentMessages")
+  receivedMessages          Message[]             @relation("ReceivedMessages")
+  notifications             Notification[]
+  eventRegistrations        EventRegistration[]
+  volunteerRequests         VolunteerRequest[]
+  gardenerRequests          GardenerRequest[]
+  tasks                     Task[]
+  reports                   Report[]
+  createdEvents             Event[]               @relation("CreatedEvents")
+  sentInvitations           Invitation[]          @relation("SentInvitations")
+  receivedGardenInvitations GardenInvitation[]    @relation("ReceivedGardenInvitations")
+  sentGardenInvitations     GardenInvitation[]    @relation("SentGardenInvitations")
+  createdSupplies           SupplyItem[]          @relation("CreatedSupplies")
+  createdSeedlings          SeedlingItem[]        @relation("CreatedSeedlings")
+
+  @@map("users")
+}
+
+// ============================================
+// GARDEN MANAGEMENT
+// ============================================
+
+model Garden {
+  id          String   @id @default(uuid())
+  name        String
+  address     String
+  description String?
+  latitude    Decimal? @db.Decimal(10, 8)
+  longitude   Decimal? @db.Decimal(11, 8)
+  zipcode     String?
+  status      String   @default("active")
+  ownerId     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  owner             User               @relation("GardenOwner", fields: [ownerId], references: [id])
+  gardenGardeners   GardenGardener[]
+  gardenVolunteers  GardenVolunteer[]
+  events            Event[]
+  volunteerRequests VolunteerRequest[]
+  tasks             Task[]
+  reports           Report[]
+  gardenInvitations GardenInvitation[]
+
+  @@map("gardens")
+}
+
+model GardenGardener {
+  id         String   @id @default(uuid())
+  gardenId   String
+  userId     String
+  assignedAt DateTime @default(now())
+
+  garden Garden @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gardenId, userId])
+  @@map("garden_gardeners")
+}
+
+model GardenVolunteer {
+  id         String   @id @default(uuid())
+  gardenId   String
+  userId     String
+  assignedAt DateTime @default(now())
+
+  garden Garden @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([gardenId, userId])
+  @@map("garden_volunteers")
+}
+
+// ============================================
+// MESSAGING
+// ============================================
+
+model Message {
+  id          String   @id @default(uuid())
+  fromUserId  String
+  toUserId    String
+  subject     String
+  content     String
+  requestType String?
+  read        Boolean  @default(false)
+  readAt      DateTime?
+  createdAt   DateTime @default(now())
+
+  fromUser User @relation("SentMessages", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("ReceivedMessages", fields: [toUserId], references: [id], onDelete: Cascade)
+
+  @@map("messages")
+}
+
+// ============================================
+// EVENTS
+// ============================================
+
+model Event {
+  id              String   @id @default(uuid())
+  title           String
+  description     String
+  gardenId        String
+  date            DateTime
+  startTime       String
+  endTime         String
+  location        String?
+  maxParticipants Int?
+  createdBy       String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  garden        Garden              @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  creator       User                @relation("CreatedEvents", fields: [createdBy], references: [id])
+  registrations EventRegistration[]
+
+  @@map("events")
+}
+
+model EventRegistration {
+  id        String   @id @default(uuid())
+  eventId   String
+  userId    String
+  status    String   @default("registered")
+  createdAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([eventId, userId])
+  @@map("event_registrations")
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+// ============================================
+// REQUESTS
+// ============================================
+
+model VolunteerRequest {
+  id          String   @id @default(uuid())
+  gardenId    String
+  requesterId String
+  title       String
+  description String
+  date        DateTime
+  status      String   @default("open")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  garden    Garden @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  requester User   @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@map("volunteer_requests")
+}
+
+model GardenerRequest {
+  id          String   @id @default(uuid())
+  requesterId String
+  title       String
+  description String
+  status      String   @default("pending")
+  requestType String   // 'supplies', 'seedlings', 'food-utility', 'volunteer-help'
+  
+  // Supplies
+  supplyIds   String[] @default([])
+  
+  // Seedlings
+  seedlingIds String[] @default([])
+  season      String?
+  quantity    Int?
+  
+  // Food/Utility
+  assistanceType String?
+  householdSize  Int?
+  
+  // Volunteer Help
+  task        String?
+  
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requester User @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+
+  @@map("gardener_requests")
+}
+
+// ============================================
+// TASKS & REPORTS
+// ============================================
+
+model Task {
+  id          String   @id @default(uuid())
+  gardenId    String
+  assignedTo  String
+  title       String
+  description String
+  dueDate     DateTime?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  garden Garden @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  user   User   @relation(fields: [assignedTo], references: [id], onDelete: Cascade)
+
+  @@map("tasks")
+}
+
+model Report {
+  id           String   @id @default(uuid())
+  userId       String
+  gardenId     String?
+  title        String
+  content      String
+  type         String
+  activityType String
+  description  String
+  hoursWorked  Decimal? @db.Decimal(5, 2)
+  rating       Int?     @db.SmallInt
+  visitDate    DateTime?
+  notes        String?
+  createdAt    DateTime @default(now())
+
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  garden Garden? @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
+
+// ============================================
+// INVITATIONS
+// ============================================
+
+model Invitation {
+  id         String   @id @default(uuid())
+  email      String
+  role       String
+  token      String   @unique
+  message    String?
+  status     String   @default("pending")
+  sentBy     String
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  acceptedAt DateTime?
+
+  sender User @relation("SentInvitations", fields: [sentBy], references: [id])
+
+  @@map("invitations")
+}
+
+model GardenInvitation {
+  id          String   @id @default(uuid())
+  gardenId    String
+  userId      String
+  invitedBy   String
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  respondedAt DateTime?
+
+  garden  Garden @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  user    User   @relation("ReceivedGardenInvitations", fields: [userId], references: [id])
+  inviter User   @relation("SentGardenInvitations", fields: [invitedBy], references: [id])
+
+  @@map("garden_invitations")
+}
+
+// ============================================
+// INVENTORY
+// ============================================
+
+model SupplyItem {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  category  String
+  available Boolean  @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creator User @relation("CreatedSupplies", fields: [createdBy], references: [id])
+
+  @@map("supply_items")
+}
+
+model SeedlingItem {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  season    String   // 'spring', 'fall', 'both'
+  available Boolean  @default(true)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  creator User @relation("CreatedSeedlings", fields: [createdBy], references: [id])
+
+  @@map("seedling_items")
+}
