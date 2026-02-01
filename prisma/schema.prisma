@@ -136,6 +136,7 @@ model Message {
 model Event {
   id              String   @id @default(uuid())
   title           String
+  type            String   // 'harvest', 'planting', 'community'
   description     String
   gardenId        String
   date            DateTime
