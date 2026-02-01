@@ -1,24 +1,22 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticate, AuthenticatedRequest } from '../../lib/middleware';
-import { successResponse, handleError } from '../../lib/response';
-import prisma from '../../lib/prisma';
+import { authenticate, AuthenticatedRequest } from '../lib/middleware';
+import { successResponse, handleError } from '../lib/response';
+import prisma from '../lib/prisma';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    if (req.method === 'GET') {
-        return handleGet(req, res);
-    } else if (req.method === 'POST') {
-        return handlePost(req, res);
-    } else {
-        return res.status(405).json({ error: 'Method not allowed' });
-    }
+    const origin = req.headers.origin;
+
+    if (req.method === 'GET') return handleList(req, res, origin);
+    if (req.method === 'POST') return handleCreate(req, res, origin);
+
+    return res.status(405).json({ error: 'Method not allowed' });
 }
 
-async function handleGet(req: VercelRequest, res: VercelResponse) {
+async function handleList(req: VercelRequest, res: VercelResponse, origin?: string) {
     try {
-        const user = authenticate(req as AuthenticatedRequest);
+        authenticate(req as AuthenticatedRequest);
         const { requestType, status } = req.query;
 
-        // Build filter
         const where: any = {};
         if (requestType && typeof requestType === 'string') {
             where.requestType = requestType;
@@ -42,17 +40,13 @@ async function handleGet(req: VercelRequest, res: VercelResponse) {
             orderBy: { createdAt: 'desc' }
         });
 
-        const origin = req.headers.origin;
         return res.status(200).json(successResponse(requests, undefined, origin));
-
     } catch (error: any) {
-        console.error('List gardener requests error:', error);
-        const origin = req.headers.origin;
         return res.status(500).json(handleError(error, origin));
     }
 }
 
-async function handlePost(req: VercelRequest, res: VercelResponse) {
+async function handleCreate(req: VercelRequest, res: VercelResponse, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
         const {
@@ -70,15 +64,13 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
         } = req.body;
 
         if (!title || !description || !requestType) {
-            return res.status(400).json(handleError(new Error('Missing required fields')));
+            return res.status(400).json(handleError(new Error('Missing required fields'), origin));
         }
 
-        // Validate request type
         if (!['supplies', 'seedlings', 'food-utility', 'volunteer-help'].includes(requestType)) {
-            return res.status(400).json(handleError(new Error('Invalid request type')));
+            return res.status(400).json(handleError(new Error('Invalid request type'), origin));
         }
 
-        // Create gardener request
         const request = await prisma.gardenerRequest.create({
             data: {
                 requesterId: user.id,
@@ -107,12 +99,8 @@ async function handlePost(req: VercelRequest, res: VercelResponse) {
             }
         });
 
-        const origin = req.headers.origin;
         return res.status(201).json(successResponse(request, 'Request submitted successfully', origin));
-
     } catch (error: any) {
-        console.error('Create gardener request error:', error);
-        const origin = req.headers.origin;
         return res.status(500).json(handleError(error, origin));
     }
 }
