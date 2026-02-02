@@ -1,6 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticate, AuthenticatedRequest } from '../lib/middleware';
+import { authenticate, AuthenticatedRequest, requireAdmin, validateRequest } from '../lib/middleware';
 import { successResponse, handleError } from '../lib/response';
+import { EventCreateSchema, EventUpdateSchema } from '../lib/validation';
 import prisma from '../lib/prisma';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
@@ -13,6 +14,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (action === 'unregister' && id && typeof id === 'string') return handleUnregister(req, res, origin, id);
         return handleCreate(req, res, origin);
     }
+    if (req.method === 'PUT' && id && typeof id === 'string') return handleUpdate(req, res, origin, id);
+    if (req.method === 'DELETE' && id && typeof id === 'string') return handleDelete(req, res, origin, id);
 
     return res.status(405).json({ error: 'Method not allowed' });
 }
@@ -78,27 +81,13 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
 async function handleCreate(req: VercelRequest, res: VercelResponse, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
-        const { title, type, description, gardenId, date, startTime, endTime, location, maxParticipants } = req.body;
-
-        if (!title || !type || !description || !gardenId || !date || !startTime || !endTime) {
-            return res.status(400).json(handleError(new Error('Missing required fields'), origin));
-        }
-
-        if (!['harvest', 'planting', 'community'].includes(type)) {
-            return res.status(400).json(handleError(new Error('Invalid event type'), origin));
-        }
+        const validatedData = validateRequest(EventCreateSchema, req.body);
 
         const event = await prisma.event.create({
             data: {
-                title,
-                type,
-                description,
-                gardenId,
-                date: new Date(date),
-                startTime,
-                endTime,
-                location,
-                maxParticipants: maxParticipants ? parseInt(maxParticipants) : null,
+                ...validatedData,
+                date: new Date(validatedData.date),
+                maxParticipants: validatedData.maxParticipants || null,
                 createdBy: user.id
             },
             include: {
@@ -125,7 +114,7 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, origin?: st
     }
 }
 
-async function handleRegister(req: VercelRequest, res: VercelResponse, origin?: string, id: string) {
+async function handleRegister(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
 
@@ -187,7 +176,7 @@ async function handleRegister(req: VercelRequest, res: VercelResponse, origin?: 
     }
 }
 
-async function handleUnregister(req: VercelRequest, res: VercelResponse, origin?: string, id: string) {
+async function handleUnregister(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
 
@@ -201,6 +190,94 @@ async function handleUnregister(req: VercelRequest, res: VercelResponse, origin?
         });
 
         return res.status(200).json(successResponse({ success: true }, 'Registration cancelled successfully', origin));
+    } catch (error: any) {
+        return res.status(500).json(handleError(error, origin));
+    }
+}
+
+async function handleUpdate(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
+    try {
+        const user = authenticate(req as AuthenticatedRequest);
+
+        const existingEvent = await prisma.event.findUnique({
+            where: { id }
+        });
+
+        if (!existingEvent) {
+            return res.status(404).json(handleError(new Error('Event not found'), origin));
+        }
+
+        // Only admin or event creator can update
+        if (user.role !== 'Admin' && existingEvent.createdBy !== user.id) {
+            return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS'), origin));
+        }
+
+        const validatedData = validateRequest(EventUpdateSchema, req.body);
+
+        const event = await prisma.event.update({
+            where: { id },
+            data: {
+                ...validatedData,
+                date: validatedData.date ? new Date(validatedData.date) : undefined,
+                maxParticipants: validatedData.maxParticipants !== undefined ? validatedData.maxParticipants : undefined
+            },
+            include: {
+                garden: {
+                    select: {
+                        id: true,
+                        name: true,
+                        address: true
+                    }
+                },
+                creator: {
+                    select: {
+                        id: true,
+                        name: true,
+                        avatarUrl: true
+                    }
+                },
+                registrations: {
+                    include: {
+                        user: {
+                            select: {
+                                id: true,
+                                name: true,
+                                avatarUrl: true
+                            }
+                        }
+                    }
+                }
+            }
+        });
+
+        return res.status(200).json(successResponse(event, 'Event updated successfully', origin));
+    } catch (error: any) {
+        return res.status(500).json(handleError(error, origin));
+    }
+}
+
+async function handleDelete(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
+    try {
+        const user = authenticate(req as AuthenticatedRequest);
+
+        const existingEvent = await prisma.event.findUnique({
+            where: { id }
+        });
+
+        if (!existingEvent) {
+            return res.status(404).json(handleError(new Error('Event not found'), origin));
+        }
+
+        // Only admin or event creator can delete
+        if (user.role !== 'Admin' && existingEvent.createdBy !== user.id) {
+            return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS'), origin));
+        }
+
+        await prisma.event.delete({
+            where: { id }
+        });
+
+        return res.status(200).json(successResponse({ success: true }, 'Event deleted successfully', origin));
     } catch (error: any) {
         return res.status(500).json(handleError(error, origin));
     }

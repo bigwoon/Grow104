@@ -1,10 +1,11 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { authenticate, AuthenticatedRequest } from '../lib/middleware';
+import { authenticate, AuthenticatedRequest, validateRequest } from '../lib/middleware';
 import { successResponse, handleError } from '../lib/response';
+import { MessageCreateSchema } from '../lib/validation';
 import prisma from '../lib/prisma';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    const { userId, action } = req.query;
+    const { userId, action, id } = req.query;
     const origin = req.headers.origin;
 
     if (req.method === 'GET') {
@@ -14,11 +15,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     if (req.method === 'POST') return handleSend(req, res, origin);
+    if (req.method === 'DELETE' && id && typeof id === 'string') return handleDelete(req, res, origin, id);
 
     return res.status(405).json({ error: 'Method not allowed' });
 }
 
-async function handleGetConversation(req: VercelRequest, res: VercelResponse, origin?: string, userId: string) {
+async function handleGetConversation(req: VercelRequest, res: VercelResponse, userId: string, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
 
@@ -69,19 +71,12 @@ async function handleGetConversation(req: VercelRequest, res: VercelResponse, or
 async function handleSend(req: VercelRequest, res: VercelResponse, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
-        const { toUserId, subject, content, requestType } = req.body;
-
-        if (!toUserId || !subject || !content) {
-            return res.status(400).json(handleError(new Error('Missing required fields'), origin));
-        }
+        const validatedData = validateRequest(MessageCreateSchema, req.body);
 
         const message = await prisma.message.create({
             data: {
                 fromUserId: user.id,
-                toUserId,
-                subject,
-                content,
-                requestType
+                ...validatedData
             },
             include: {
                 fromUser: {
@@ -119,6 +114,33 @@ async function handleUnreadCount(req: VercelRequest, res: VercelResponse, origin
         });
 
         return res.status(200).json(successResponse({ count }, undefined, origin));
+    } catch (error: any) {
+        return res.status(500).json(handleError(error, origin));
+    }
+}
+
+async function handleDelete(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
+    try {
+        const user = authenticate(req as AuthenticatedRequest);
+
+        const message = await prisma.message.findUnique({
+            where: { id }
+        });
+
+        if (!message) {
+            return res.status(404).json(handleError(new Error('Message not found'), origin));
+        }
+
+        // Users can only delete messages they sent or received
+        if (message.fromUserId !== user.id && message.toUserId !== user.id) {
+            return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS'), origin));
+        }
+
+        await prisma.message.delete({
+            where: { id }
+        });
+
+        return res.status(200).json(successResponse({ success: true }, 'Message deleted successfully', origin));
     } catch (error: any) {
         return res.status(500).json(handleError(error, origin));
     }

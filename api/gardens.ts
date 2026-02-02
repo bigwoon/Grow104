@@ -4,12 +4,16 @@ import { successResponse, handleError } from '../lib/response';
 import prisma from '../lib/prisma';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-    const { id } = req.query;
+    const { id, action } = req.query;
     const origin = req.headers.origin;
 
     if (req.method === 'GET') {
+        // Handle map data request
+        if (action === 'map') return handleMapData(req, res, origin);
+
+        // Handle single garden or list
         if (id && typeof id === 'string') {
-            return handleGetSingle(req, res, origin, id);
+            return handleGetSingle(req, res, id, origin);
         }
         return handleList(req, res, origin);
     }
@@ -72,7 +76,7 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
     }
 }
 
-async function handleGetSingle(req: VercelRequest, res: VercelResponse, origin?: string, id: string) {
+async function handleGetSingle(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
     try {
         authenticate(req as AuthenticatedRequest);
 
@@ -150,6 +154,48 @@ async function handleGetSingle(req: VercelRequest, res: VercelResponse, origin?:
         }
 
         return res.status(200).json(successResponse(garden, undefined, origin));
+    } catch (error: any) {
+        return res.status(500).json(handleError(error, origin));
+    }
+}
+
+async function handleMapData(req: VercelRequest, res: VercelResponse, origin?: string) {
+    try {
+        authenticate(req as AuthenticatedRequest);
+
+        // Get all active gardens with their locations for map display
+        const gardens = await prisma.garden.findMany({
+            where: {
+                status: 'active',
+                latitude: { not: null },
+                longitude: { not: null }
+            },
+            select: {
+                id: true,
+                name: true,
+                address: true,
+                latitude: true,
+                longitude: true,
+                zipcode: true,
+                owner: {
+                    select: {
+                        id: true,
+                        name: true
+                    }
+                },
+                _count: {
+                    select: {
+                        gardenGardeners: true,
+                        gardenVolunteers: true,
+                        volunteerRequests: {
+                            where: { status: 'open' }
+                        }
+                    }
+                }
+            }
+        });
+
+        return res.status(200).json(successResponse(gardens, undefined, origin));
     } catch (error: any) {
         return res.status(500).json(handleError(error, origin));
     }

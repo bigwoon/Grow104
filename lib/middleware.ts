@@ -1,5 +1,7 @@
 import { VercelRequest } from '@vercel/node';
 import jwt from 'jsonwebtoken';
+import { z } from 'zod';
+import prisma from './prisma';
 
 export interface AuthenticatedRequest extends VercelRequest {
     user?: {
@@ -51,4 +53,57 @@ export const requireRole = (user: { role: string }, allowedRoles: string[]) => {
  */
 export const requireAdmin = (user: { role: string }) => {
     requireRole(user, ['Admin']);
+};
+
+/**
+ * Check if user is admin or gardener
+ * @throws Error if user is neither admin nor gardener
+ */
+export const requireGardenerOrAdmin = (user: { role: string }) => {
+    requireRole(user, ['Admin', 'Gardener']);
+};
+
+/**
+ * Validate request body against Zod schema
+ * @throws ZodError if validation fails
+ */
+export const validateRequest = <T>(schema: z.ZodSchema<T>, data: any): T => {
+    return schema.parse(data);
+};
+
+/**
+ * Check if user owns or is assigned to a garden
+ * @throws Error if user doesn't have access to the garden
+ */
+export const requireGardenAccess = async (userId: string, gardenId: string, role: string) => {
+    // Admins have access to all gardens
+    if (role === 'Admin') {
+        return;
+    }
+
+    const garden = await prisma.garden.findUnique({
+        where: { id: gardenId },
+        include: {
+            gardenGardeners: {
+                where: { userId }
+            },
+            gardenVolunteers: {
+                where: { userId }
+            }
+        }
+    });
+
+    if (!garden) {
+        throw new Error('GARDEN_NOT_FOUND');
+    }
+
+    // Check if user is owner, gardener, or volunteer
+    const hasAccess =
+        garden.ownerId === userId ||
+        garden.gardenGardeners.length > 0 ||
+        garden.gardenVolunteers.length > 0;
+
+    if (!hasAccess) {
+        throw new Error('INSUFFICIENT_PERMISSIONS');
+    }
 };

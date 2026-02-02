@@ -6,11 +6,21 @@ const getAllowedOrigin = (origin?: string): string => {
     const allowedOrigins = [
         'https://grow104.org',
         'http://localhost:3000',
+        'https://localhost:3000',
         'http://localhost:5173',
-        'http://localhost:5174'
+        'https://localhost:5173',
+        'http://localhost:5174',
+        'https://localhost:5174',
+        'http://127.0.0.1:3000',
+        'https://127.0.0.1:3000'
     ];
 
     if (origin && allowedOrigins.includes(origin)) {
+        return origin;
+    }
+
+    // Allow any localhost origin in development
+    if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
         return origin;
     }
 
@@ -63,16 +73,40 @@ export const errorResponse = (error: string, statusCode: number = 500, origin?: 
 /**
  * Map common errors to appropriate status codes and messages
  */
-export const handleError = (error: any) => {
+export const handleError = (error: any, origin?: string) => {
+    // Zod validation errors
+    if (error.name === 'ZodError') {
+        const validationErrors = error.errors.map((err: any) => ({
+            field: err.path.join('.'),
+            message: err.message,
+        }));
+        return {
+            statusCode: 400,
+            headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': getAllowedOrigin(origin),
+                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+                'Access-Control-Allow-Credentials': 'true'
+            },
+            body: JSON.stringify({
+                success: false,
+                error: 'Validation failed',
+                validationErrors,
+                statusCode: 400
+            })
+        };
+    }
+
     // Authentication errors
     if (error.message === 'NO_TOKEN') {
-        return errorResponse('No authentication token provided', 401);
+        return errorResponse('No authentication token provided', 401, origin);
     }
     if (error.message === 'INVALID_TOKEN') {
-        return errorResponse('Invalid or expired token', 401);
+        return errorResponse('Invalid or expired token', 401, origin);
     }
     if (error.message === 'INSUFFICIENT_PERMISSIONS') {
-        return errorResponse('Insufficient permissions', 403);
+        return errorResponse('Insufficient permissions', 403, origin);
     }
 
     // Business logic errors
@@ -81,7 +115,7 @@ export const handleError = (error: any) => {
             statusCode: 409,
             headers: {
                 'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': getAllowedOrigin(),
+                'Access-Control-Allow-Origin': getAllowedOrigin(origin),
                 'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
                 'Access-Control-Allow-Headers': 'Content-Type, Authorization',
                 'Access-Control-Allow-Credentials': 'true'
@@ -96,13 +130,36 @@ export const handleError = (error: any) => {
 
     // Validation errors
     if (error.code === 'P2002') {
-        return errorResponse('A record with this value already exists', 409);
+        return errorResponse('A record with this value already exists', 409, origin);
     }
     if (error.code === 'P2025') {
-        return errorResponse('Record not found', 404);
+        return errorResponse('Record not found', 404, origin);
     }
 
     // Default error
     console.error('Unhandled error:', error);
-    return errorResponse(error.message || 'Internal server error', 500);
+    return errorResponse(error.message || 'Internal server error', 500, origin);
 };
+
+/**
+ * Validation error response for Zod errors
+ */
+export const validationErrorResponse = (errors: { field: string; message: string }[], origin?: string) => {
+    return {
+        statusCode: 400,
+        headers: {
+            'Content-Type': 'application/json',
+            'Access-Control-Allow-Origin': getAllowedOrigin(origin),
+            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+            'Access-Control-Allow-Credentials': 'true'
+        },
+        body: JSON.stringify({
+            success: false,
+            error: 'Validation failed',
+            validationErrors: errors,
+            statusCode: 400
+        })
+    };
+};
+
