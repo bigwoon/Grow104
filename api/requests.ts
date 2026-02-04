@@ -9,10 +9,16 @@ import {
 } from '../lib/validation';
 import { getGardenerGarden } from '../lib/utils';
 import prisma from '../lib/prisma';
+import { handleCorsPreflightRequest } from '../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { type, id, action } = req.query;
     const origin = req.headers.origin;
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        return handleCorsPreflightRequest(req, res, origin);
+    }
 
     // Route to gardener or volunteer request handlers based on type
     if (type === 'gardener') {

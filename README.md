@@ -32,7 +32,9 @@ Fill in your credentials:
 - `JWT_SECRET` - Random secret for JWT tokens
 - `JWT_REFRESH_SECRET` - Random secret for refresh tokens
 - `CLOUDINARY_*` - Cloudinary credentials
-- `GOOGLE_MAPS_API_KEY` - Google Maps API key for geocoding
+- `FRONTEND_URL` - Frontend URL for CORS (e.g., https://www.grow104.org)
+
+**Note:** Geocoding uses Nominatim (OpenStreetMap) - no API key required!
 
 ### 3. Setup Database
 

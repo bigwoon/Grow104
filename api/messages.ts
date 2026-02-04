@@ -3,10 +3,16 @@ import { authenticate, AuthenticatedRequest, validateRequest } from '../lib/midd
 import { successResponse, handleError } from '../lib/response';
 import { MessageCreateSchema } from '../lib/validation';
 import prisma from '../lib/prisma';
+import { handleCorsPreflightRequest } from '../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { userId, action, id } = req.query;
     const origin = req.headers.origin;
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        return handleCorsPreflightRequest(req, res, origin);
+    }
 
     if (req.method === 'GET') {
         if (action === 'unread-count') return handleUnreadCount(req, res, origin);

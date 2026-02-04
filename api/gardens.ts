@@ -2,10 +2,16 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticate, AuthenticatedRequest } from '../lib/middleware';
 import { successResponse, handleError } from '../lib/response';
 import prisma from '../lib/prisma';
+import { handleCorsPreflightRequest } from '../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id, action } = req.query;
     const origin = req.headers.origin;
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        return handleCorsPreflightRequest(req, res, origin);
+    }
 
     if (req.method === 'GET') {
         // Handle map data request

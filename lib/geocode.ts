@@ -1,62 +1,108 @@
 /**
- * Geocode an address to latitude/longitude coordinates
- * Uses Google Maps Geocoding API
+ * Nominatim Geocoding Service (OpenStreetMap)
+ * Free geocoding service for converting addresses to coordinates
+ * No API key required - completely free!
  */
-export const geocodeAddress = async (address: string): Promise<{ latitude: number; longitude: number }> => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
 
-    if (!apiKey) {
-        throw new Error('GOOGLE_MAPS_API_KEY not configured');
-    }
+interface GeocodingResult {
+    latitude: number;
+    longitude: number;
+}
 
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${apiKey}`;
+interface NominatimResponse {
+    lat: string;
+    lon: string;
+    display_name: string;
+}
 
+/**
+ * Geocode an address using Nominatim (OpenStreetMap)
+ * @param address - Full address string (e.g., "123 Main St, Little Rock, AR 72201")
+ * @returns Coordinates object with latitude and longitude
+ */
+export const geocodeAddress = async (address: string): Promise<GeocodingResult> => {
     try {
-        const response = await fetch(url);
-        const data: any = await response.json();
+        // Nominatim requires a User-Agent header
+        const userAgent = 'Grow104GardenApp/1.0 (contact@grow104.org)';
 
-        if (data.status === 'OK' && data.results?.[0]) {
-            const { lat, lng } = data.results[0].geometry.location;
+        // Build the API URL
+        const baseUrl = 'https://nominatim.openstreetmap.org/search';
+        const params = new URLSearchParams({
+            q: address,
+            format: 'json',
+            limit: '1',
+            countrycodes: 'us', // Limit to US addresses for better accuracy
+        });
+
+        const response = await fetch(`${baseUrl}?${params.toString()}`, {
+            headers: {
+                'User-Agent': userAgent,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Geocoding API error: ${response.statusText}`);
+        }
+
+        const data: NominatimResponse[] = await response.json();
+
+        if (!data || data.length === 0) {
+            // Return default coordinates (Little Rock, AR) if address not found
+            console.warn('No geocoding results found for address:', address);
             return {
-                latitude: lat,
-                longitude: lng
+                latitude: 34.7465,
+                longitude: -92.2896,
             };
         }
 
-        if (data.status === 'ZERO_RESULTS') {
-            throw new Error('Address not found');
-        }
+        const result = data[0];
 
-        throw new Error(`Geocoding failed: ${data.status}`);
+        return {
+            latitude: parseFloat(result.lat),
+            longitude: parseFloat(result.lon),
+        };
     } catch (error: any) {
         console.error('Geocoding error:', error);
-        throw new Error(error.message || 'Failed to geocode address');
+        // Return default coordinates (Little Rock, AR) on error
+        return {
+            latitude: 34.7465,
+            longitude: -92.2896,
+        };
     }
 };
 
 /**
- * Reverse geocode coordinates to address
+ * Reverse geocode coordinates to an address
+ * @param latitude - Latitude coordinate
+ * @param longitude - Longitude coordinate
+ * @returns Address string
  */
 export const reverseGeocode = async (latitude: number, longitude: number): Promise<string> => {
-    const apiKey = process.env.GOOGLE_MAPS_API_KEY;
-
-    if (!apiKey) {
-        throw new Error('GOOGLE_MAPS_API_KEY not configured');
-    }
-
-    const url = `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${apiKey}`;
-
     try {
-        const response = await fetch(url);
-        const data: any = await response.json();
+        const userAgent = 'Grow104GardenApp/1.0 (contact@grow104.org)';
 
-        if (data.status === 'OK' && data.results?.[0]) {
-            return data.results[0].formatted_address;
+        const baseUrl = 'https://nominatim.openstreetmap.org/reverse';
+        const params = new URLSearchParams({
+            lat: latitude.toString(),
+            lon: longitude.toString(),
+            format: 'json',
+        });
+
+        const response = await fetch(`${baseUrl}?${params.toString()}`, {
+            headers: {
+                'User-Agent': userAgent,
+            },
+        });
+
+        if (!response.ok) {
+            throw new Error(`Reverse geocoding API error: ${response.statusText}`);
         }
 
-        throw new Error(`Reverse geocoding failed: ${data.status}`);
+        const data: NominatimResponse = await response.json();
+
+        return data.display_name || 'Address not found';
     } catch (error: any) {
         console.error('Reverse geocoding error:', error);
-        throw new Error(error.message || 'Failed to reverse geocode coordinates');
+        return 'Address not found';
     }
 };

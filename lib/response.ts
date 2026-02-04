@@ -3,15 +3,20 @@
  * Allows production domain and localhost for development
  */
 const getAllowedOrigin = (origin?: string): string => {
+    // Use FRONTEND_URL from environment variables
+    const productionUrl = process.env.FRONTEND_URL || 'https://www.grow104.org';
+
     const allowedOrigins = [
-        'https://grow104.org',
-        'http://localhost:3000',
+        productionUrl,                      // Primary production URL (with www)
+        'https://www.grow104.org',          // Production with www
+        'https://grow104.org',              // Production without www
+        'http://localhost:3000',            // Local dev (React default)
         'https://localhost:3000',
-        'http://localhost:5173',
+        'http://localhost:5173',            // Local dev (Vite default)
         'https://localhost:5173',
-        'http://localhost:5174',
+        'http://localhost:5174',            // Local dev (Vite alternate)
         'https://localhost:5174',
-        'http://127.0.0.1:3000',
+        'http://127.0.0.1:3000',            // Local dev (IP)
         'https://127.0.0.1:3000'
     ];
 
@@ -25,7 +30,7 @@ const getAllowedOrigin = (origin?: string): string => {
     }
 
     // Default to production domain
-    return 'https://grow104.org';
+    return productionUrl;
 };
 
 /**

@@ -7,10 +7,16 @@ import prisma from '../lib/prisma';
 import { uploadImage } from '../lib/cloudinary';
 import { geocodeAddress } from '../lib/geocode';
 import { createNotification, getAdminIds } from '../lib/utils';
+import { handleCorsPreflightRequest } from '../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { action } = req.query;
     const origin = req.headers.origin;
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        return handleCorsPreflightRequest(req, res, origin);
+    }
 
     if (req.method === 'POST') {
         if (action === 'signup') return handleSignup(req, res, origin);

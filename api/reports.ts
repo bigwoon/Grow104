@@ -4,10 +4,16 @@ import { successResponse, handleError } from '../lib/response';
 import { getGardenerGarden } from '../lib/utils';
 import { ReportCreateSchema } from '../lib/validation';
 import prisma from '../lib/prisma';
+import { handleCorsPreflightRequest } from '../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { id } = req.query;
     const origin = req.headers.origin;
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        return handleCorsPreflightRequest(req, res, origin);
+    }
 
     if (req.method === 'GET') {
         if (id && typeof id === 'string') return handleGetSingle(req, res, origin, id);

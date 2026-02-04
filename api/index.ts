@@ -1,6 +1,14 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
+import { handleCorsPreflightRequest } from '../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+    const origin = req.headers.origin;
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        return handleCorsPreflightRequest(req, res, origin);
+    }
+
     return res.status(200).json({
         success: true,
         message: 'SS Garden App API is running',

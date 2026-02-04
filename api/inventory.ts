@@ -3,10 +3,16 @@ import { authenticate, AuthenticatedRequest, requireAdmin, validateRequest } fro
 import { successResponse, handleError } from '../lib/response';
 import { SupplyCreateSchema, SupplyUpdateSchema, SeedlingCreateSchema, SeedlingUpdateSchema } from '../lib/validation';
 import prisma from '../lib/prisma';
+import { handleCorsPreflightRequest } from '../lib/cors';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { type, id } = req.query;
     const origin = req.headers.origin;
+
+    // Handle CORS preflight
+    if (req.method === 'OPTIONS') {
+        return handleCorsPreflightRequest(req, res, origin);
+    }
 
     if (!type || (type !== 'supplies' && type !== 'seedlings')) {
         return res.status(400).json(handleError(new Error('Type parameter required (supplies or seedlings)'), origin));
