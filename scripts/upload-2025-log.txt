@@ -1,0 +1,172 @@
+≡ƒî▒ Starting Home Gardener 2025 Upload (email-only)...
+
+≡ƒôï Found 12 gardeners with valid emails
+
+--- James Smith (jsmithsouthside@yahoo.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Connie Snow (conniesnow.cs@gmail.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Russell Jack (r.russell.jack@gmail.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Henry Scott (hhstt2003@yahoo.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Porsha Harvey (porshahavey25@gmail.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+--- Misahalay Morris (misahalaym@gmail.com) ---
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Perry Washington (perrywashington@mail.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Ruth Acosta (ruth364@yahoo.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Roderick Sherman (rodsher@yahoo.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Louis Lafleur (louislafleur34@gmail.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Tony Gatewood/ Ms. Ethel (ethelmullenix3@gmail.com) ---
+  Γ¥î Error: 
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+--- Kasandra Ewing (ksand01@aol.com) ---
+  Γ¥î Error: 
+
+Invalid `prisma.user.findUnique()` invocation in
+C:\Users\User\Documents\ssgardenapp\Grow104backend\scripts\upload-home-gardeners-2025.ts:98:48
+
+  95 
+  96 try {
+  97     // Check if user already exists
+ΓåÆ 98     const existing = await prisma.user.findUnique(
+Can't reach database server at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`
+
+Please make sure your database server is running at `ep-shiny-mud-ahqwzqz4-pooler.c-3.us-east-1.aws.neon.tech:5432`.
+
+=============================
+≡ƒôè Upload Summary
+=============================
+  Γ£à Created:  0
+  ΓÅ¡∩╕Å  Skipped:  0
+  Γ¥î Errors:   12
+  ≡ƒô¥ Total:    12
+
+≡ƒÆí Default password for all new users: Grow104!
+   Users should change their password after first login.
+

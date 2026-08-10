@@ -42,6 +42,7 @@ model User {
   tasks                     Task[]
   volunteerAssignments      VolunteerAssignment[]
   volunteerRequests         VolunteerRequest[]
+  assignedEventTasks        EventTask[]           @relation("AssignedEventTasks")
 
   @@map("users")
 }
@@ -127,9 +128,12 @@ model Event {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
   type            String
+  requestId       String?
+  tasks           EventTask[]
   registrations   EventRegistration[]
   creator         User                @relation("CreatedEvents", fields: [createdBy], references: [id])
   garden          Garden              @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  request         GardenerRequest?    @relation("ConvertedEvent", fields: [requestId], references: [id], onDelete: SetNull)
 
   @@map("events")
 }
@@ -145,6 +149,21 @@ model EventRegistration {
 
   @@unique([eventId, userId])
   @@map("event_registrations")
+}
+
+model EventTask {
+  id          String   @id @default(uuid())
+  eventId     String
+  title       String
+  description String?
+  assignedTo  String?
+  status      String   @default("pending")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  event       Event    @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  assignedUser User?   @relation("AssignedEventTasks", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@map("event_tasks")
 }
 
 model Notification {
@@ -210,9 +229,11 @@ model GardenerRequest {
   householdSize  Int?
   task           String?
   notes          String?
+  eventId        String?
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
   requester      User     @relation(fields: [requesterId], references: [id], onDelete: Cascade)
+  convertedEvent Event[]  @relation("ConvertedEvent")
 
   @@map("gardener_requests")
 }

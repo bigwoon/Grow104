@@ -5,7 +5,7 @@ $API_BASE = "https://grow104-snowy.vercel.app"
 
 # Use the existing test user credentials
 $loginBody = @{
-    email = "apitest@grow104.com"
+    email    = "apitest@grow104.com"
     password = "TestPass123!"
 } | ConvertTo-Json
 
@@ -24,19 +24,19 @@ $headers = @{
 
 # Test each endpoint and capture detailed errors
 $endpoints = @(
-    @{Name="Gardener Requests"; Url="$API_BASE/api/requests?type=gardener"},
-    @{Name="Volunteer Requests"; Url="$API_BASE/api/requests?type=volunteer"},
-    @{Name="Map Data"; Url="$API_BASE/api/gardens?action=map"},
-    @{Name="Gardens"; Url="$API_BASE/api/gardens"},
-    @{Name="Notifications"; Url="$API_BASE/api/notifications"},
-    @{Name="Tasks"; Url="$API_BASE/api/tasks"},
-    @{Name="Supplies"; Url="$API_BASE/api/inventory?type=supplies"},
-    @{Name="Seedlings"; Url="$API_BASE/api/inventory?type=seedlings"},
-    @{Name="Events"; Url="$API_BASE/api/events"},
-    @{Name="Messages"; Url="$API_BASE/api/messages"},
-    @{Name="Reports"; Url="$API_BASE/api/reports"},
-    @{Name="Users"; Url="$API_BASE/api/users"},
-    @{Name="Garden Invitations"; Url="$API_BASE/api/garden-invitations"}
+    @{Name = "Gardener Requests"; Url = "$API_BASE/api/requests?type=gardener" },
+    @{Name = "Volunteer Requests"; Url = "$API_BASE/api/requests?type=volunteer" },
+    @{Name = "Map Data"; Url = "$API_BASE/api/gardens?action=map" },
+    @{Name = "Gardens"; Url = "$API_BASE/api/gardens" },
+    @{Name = "Notifications"; Url = "$API_BASE/api/notifications" },
+    @{Name = "Tasks"; Url = "$API_BASE/api/tasks" },
+    @{Name = "Supplies"; Url = "$API_BASE/api/inventory?type=supplies" },
+    @{Name = "Seedlings"; Url = "$API_BASE/api/inventory?type=seedlings" },
+    @{Name = "Events"; Url = "$API_BASE/api/events" },
+    @{Name = "Messages"; Url = "$API_BASE/api/messages?format=conversations" },
+    @{Name = "Reports"; Url = "$API_BASE/api/reports" },
+    @{Name = "Users"; Url = "$API_BASE/api/users" },
+    @{Name = "Garden Invitations"; Url = "$API_BASE/api/garden-invitations" }
 )
 
 Write-Host "`n=== Testing All Endpoints ===" -ForegroundColor Cyan
@@ -50,11 +50,12 @@ foreach ($endpoint in $endpoints) {
         Write-Host "✅ $($endpoint.Name): $count items" -ForegroundColor Green
         $results += @{
             Endpoint = $endpoint.Name
-            Status = "Success"
-            Count = $count
-            Error = $null
+            Status   = "Success"
+            Count    = $count
+            Error    = $null
         }
-    } catch {
+    }
+    catch {
         $statusCode = $_.Exception.Response.StatusCode.value__
         $errorBody = $_.ErrorDetails.Message
         
@@ -67,16 +68,17 @@ foreach ($endpoint in $endpoints) {
                 if ($errorJson.validationErrors) {
                     Write-Host "   Validation Errors: $($errorJson.validationErrors)" -ForegroundColor Yellow
                 }
-            } catch {
+            }
+            catch {
                 Write-Host "   Raw Error: $errorBody" -ForegroundColor Yellow
             }
         }
         
         $results += @{
-            Endpoint = $endpoint.Name
-            Status = "Failed"
+            Endpoint   = $endpoint.Name
+            Status     = "Failed"
             StatusCode = $statusCode
-            Error = $errorBody
+            Error      = $errorBody
         }
     }
 }

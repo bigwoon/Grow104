@@ -108,29 +108,41 @@ export const SeedlingUpdateSchema = z.object({
 // EVENT SCHEMAS
 // ============================================
 
+export const EventTaskSchema = z.object({
+    id: z.string().uuid().optional(),
+    title: z.string().min(1).max(200),
+    description: z.string().max(1000).optional().nullable(),
+    assignedTo: z.string().uuid().optional().nullable(),
+    status: z.enum(['pending', 'in_progress', 'completed']).default('pending'),
+});
+
 export const EventCreateSchema = z.object({
     title: z.string().min(1).max(200),
     type: z.enum(['harvest', 'planting', 'community', 'workshop', 'cleanup', 'social', 'training']),
     description: z.string().max(2000).optional(),
     gardenId: z.string().uuid(),
-    date: z.string().datetime(),
+    date: z.string().optional(),
     time: z.string().optional(),
-    startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
-    endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+    startTime: z.string().optional(),
+    endTime: z.string().optional(),
     location: z.string().max(500).optional(),
     maxParticipants: z.number().int().positive().optional(),
+    requestId: z.string().uuid().optional().nullable(),
+    tasks: z.array(EventTaskSchema).optional(),
 });
 
 export const EventUpdateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
     type: z.enum(['harvest', 'planting', 'community', 'workshop', 'cleanup', 'social', 'training']).optional(),
     description: z.string().max(2000).optional(),
-    date: z.string().datetime().optional(),
+    date: z.string().optional(),
     time: z.string().optional(),
-    startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
-    endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+    startTime: z.string().optional(),
+    endTime: z.string().optional(),
     location: z.string().max(500).optional().nullable(),
     maxParticipants: z.number().int().positive().optional().nullable(),
+    requestId: z.string().uuid().optional().nullable(),
+    tasks: z.array(EventTaskSchema).optional(),
 });
 
 // ============================================

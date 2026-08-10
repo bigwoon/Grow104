@@ -33,6 +33,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (req.method === 'POST') {
             if (action === 'food-utility') return handleGardenerFoodUtility(req, res, origin);
             if (action === 'seedlings') return handleGardenerSeedlings(req, res, origin);
+            if (action === 'convert-to-event' && id && typeof id === 'string') return handleConvertToEvent(req, res, id, origin);
             return handleGardenerCreate(req, res, origin);
         }
         if ((req.method === 'PUT' || req.method === 'PATCH') && id && typeof id === 'string') return handleGardenerUpdate(req, res, id, origin);
@@ -587,6 +588,107 @@ async function handleTaskDelete(req: VercelRequest, res: VercelResponse, id: str
         await prisma.task.delete({ where: { id } });
         setCorsHeaders(res, origin);
         return res.status(200).json(successResponse({ success: true }));
+    } catch (error: any) {
+        setCorsHeaders(res, origin);
+        const { status, payload } = handleError(error);
+        return res.status(status).json(payload);
+    }
+}
+
+async function handleConvertToEvent(req: VercelRequest, res: VercelResponse, requestId: string, origin?: string) {
+    try {
+        const adminUser = authenticate(req as AuthenticatedRequest);
+        requireAdmin(adminUser);
+
+        const request = await prisma.gardenerRequest.findUnique({
+            where: { id: requestId },
+            include: { requester: { select: { id: true, name: true } } }
+        });
+
+        if (!request) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('Gardener request not found')).payload);
+        }
+
+        const {
+            title,
+            description,
+            type,
+            gardenId,
+            date,
+            time,
+            startTime,
+            endTime,
+            location,
+            maxParticipants,
+            tasks
+        } = req.body;
+
+        if (!title || !gardenId) {
+            setCorsHeaders(res, origin);
+            return res.status(400).json(handleError(new Error('Title and gardenId are required')).payload);
+        }
+
+        const eventStartTime = startTime || time || '09:00';
+        const eventEndTime = endTime || eventStartTime;
+
+        const [event, updatedRequest] = await prisma.$transaction(async (tx) => {
+            const newEvent = await tx.event.create({
+                data: {
+                    title,
+                    type: type || 'community',
+                    description: description || request.description || '',
+                    gardenId,
+                    date: new Date(date || Date.now()),
+                    startTime: eventStartTime,
+                    endTime: eventEndTime,
+                    location: location || null,
+                    maxParticipants: maxParticipants ? Number(maxParticipants) : null,
+                    createdBy: adminUser.id,
+                    requestId: request.id,
+                    ...(Array.isArray(tasks) && tasks.length > 0 ? {
+                        tasks: {
+                            create: tasks.map((t: any) => ({
+                                title: t.title,
+                                description: t.description || null,
+                                assignedTo: t.assignedTo || null,
+                                status: t.status || 'pending'
+                            }))
+                        }
+                    } : {})
+                },
+                include: {
+                    garden: { select: { id: true, name: true, address: true } },
+                    creator: { select: { id: true, name: true, avatarUrl: true } },
+                    tasks: { include: { assignedUser: { select: { id: true, name: true, avatarUrl: true } } } }
+                }
+            });
+
+            const reqUpdate = await tx.gardenerRequest.update({
+                where: { id: request.id },
+                data: {
+                    status: 'approved',
+                    eventId: newEvent.id
+                }
+            });
+
+            await tx.notification.create({
+                data: {
+                    userId: request.requesterId,
+                    title: 'Request Approved & Event Scheduled',
+                    message: `Your request "${request.title}" has been approved and scheduled as an event: "${newEvent.title}"`,
+                    type: 'event'
+                }
+            });
+
+            return [newEvent, reqUpdate];
+        });
+
+        setCorsHeaders(res, origin);
+        return res.status(201).json(successResponse({
+            event: { ...event, _id: event.id, time: event.startTime },
+            request: { ...updatedRequest, _id: updatedRequest.id }
+        }, 'Request converted to event successfully'));
     } catch (error: any) {
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);

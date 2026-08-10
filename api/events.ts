@@ -18,9 +18,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
         if (action === 'register' && id && typeof id === 'string') return handleRegister(req, res, id, origin);
         if (action === 'unregister' && id && typeof id === 'string') return handleUnregister(req, res, id, origin);
+        if (action === 'task-status') return handleTaskStatus(req, res, origin);
         return handleCreate(req, res, origin);
     }
-    if (req.method === 'PUT' && id && typeof id === 'string') return handleUpdate(req, res, id, origin);
+    if (req.method === 'PATCH' && action === 'task-status') return handleTaskStatus(req, res, origin);
+    if (req.method === 'PUT' && id && typeof id === 'string') {
+        if (action === 'task-status') return handleTaskStatus(req, res, origin);
+        return handleUpdate(req, res, id, origin);
+    }
     if (req.method === 'DELETE' && id && typeof id === 'string') return handleDelete(req, res, id, origin);
 
     setCorsHeaders(res, origin);
@@ -75,6 +80,18 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
                         }
                     }
                 },
+                tasks: {
+                    include: {
+                        assignedUser: {
+                            select: {
+                                id: true,
+                                name: true,
+                                avatarUrl: true
+                            }
+                        }
+                    },
+                    orderBy: { createdAt: 'asc' }
+                },
                 _count: {
                     select: {
                         registrations: true
@@ -89,7 +106,8 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
             _id: e.id,
             time: e.startTime || undefined,
             garden: e.garden ? { ...e.garden, _id: e.garden.id } : null,
-            registrations: e.registrations?.map(r => ({ ...r, _id: r.id }))
+            registrations: e.registrations?.map(r => ({ ...r, _id: r.id })),
+            tasks: e.tasks?.map(t => ({ ...t, _id: t.id }))
         }));
 
         setCorsHeaders(res, origin);
@@ -121,12 +139,23 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, origin?: st
                 type: validatedData.type,
                 description,
                 gardenId: validatedData.gardenId,
-                date: new Date(validatedData.date),
+                date: new Date(validatedData.date || Date.now()),
                 startTime,
                 endTime,
                 location: validatedData.location || null,
                 maxParticipants: validatedData.maxParticipants || null,
-                createdBy: user.id
+                createdBy: user.id,
+                requestId: validatedData.requestId || null,
+                ...(validatedData.tasks && validatedData.tasks.length > 0 ? {
+                    tasks: {
+                        create: validatedData.tasks.map(t => ({
+                            title: t.title,
+                            description: t.description || null,
+                            assignedTo: t.assignedTo || null,
+                            status: t.status || 'pending'
+                        }))
+                    }
+                } : {})
             },
             include: {
                 garden: {
@@ -141,6 +170,17 @@ async function handleCreate(req: VercelRequest, res: VercelResponse, origin?: st
                         id: true,
                         name: true,
                         avatarUrl: true
+                    }
+                },
+                tasks: {
+                    include: {
+                        assignedUser: {
+                            select: {
+                                id: true,
+                                name: true,
+                                avatarUrl: true
+                            }
+                        }
                     }
                 }
             }
@@ -305,42 +345,49 @@ async function handleUpdate(req: VercelRequest, res: VercelResponse, id: string,
                 date: validatedData.date ? new Date(validatedData.date) : undefined,
                 maxParticipants: validatedData.maxParticipants !== undefined ? validatedData.maxParticipants : undefined,
                 ...(updateStartTime ? { startTime: updateStartTime } : {}),
-                ...(validatedData.endTime ? { endTime: validatedData.endTime } : {})
+                ...(validatedData.endTime ? { endTime: validatedData.endTime } : {}),
+                ...(validatedData.requestId !== undefined ? { requestId: validatedData.requestId } : {}),
             },
             include: {
-                garden: {
-                    select: {
-                        id: true,
-                        name: true,
-                        address: true
-                    }
-                },
-                creator: {
-                    select: {
-                        id: true,
-                        name: true,
-                        avatarUrl: true
-                    }
-                },
-                registrations: {
-                    include: {
-                        user: {
-                            select: {
-                                id: true,
-                                name: true,
-                                avatarUrl: true
-                            }
-                        }
-                    }
-                }
+                garden: { select: { id: true, name: true, address: true } },
+                creator: { select: { id: true, name: true, avatarUrl: true } },
+                registrations: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
+                tasks: { include: { assignedUser: { select: { id: true, name: true, avatarUrl: true } } } }
+            }
+        });
+
+        // If tasks array was supplied on update, sync tasks
+        if (validatedData.tasks) {
+            await prisma.eventTask.deleteMany({ where: { eventId: id } });
+            if (validatedData.tasks.length > 0) {
+                await prisma.eventTask.createMany({
+                    data: validatedData.tasks.map(t => ({
+                        eventId: id,
+                        title: t.title,
+                        description: t.description || null,
+                        assignedTo: t.assignedTo || null,
+                        status: t.status || 'pending'
+                    }))
+                });
+            }
+        }
+
+        const updatedEventWithTasks = await prisma.event.findUnique({
+            where: { id },
+            include: {
+                garden: { select: { id: true, name: true, address: true } },
+                creator: { select: { id: true, name: true, avatarUrl: true } },
+                registrations: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
+                tasks: { include: { assignedUser: { select: { id: true, name: true, avatarUrl: true } } } }
             }
         });
 
         setCorsHeaders(res, origin);
         return res.status(200).json(successResponse({
-            ...event,
+            ...(updatedEventWithTasks || event),
             _id: event.id,
-            time: event.startTime || undefined
+            time: event.startTime || undefined,
+            tasks: (updatedEventWithTasks || event).tasks?.map(t => ({ ...t, _id: t.id }))
         }, 'Event updated successfully'));
     } catch (error: any) {
         setCorsHeaders(res, origin);
@@ -374,6 +421,30 @@ async function handleDelete(req: VercelRequest, res: VercelResponse, id: string,
 
         setCorsHeaders(res, origin);
         return res.status(200).json(successResponse({ success: true }, 'Event deleted successfully'));
+    } catch (error: any) {
+        setCorsHeaders(res, origin);
+        const { status, payload } = handleError(error);
+        return res.status(status).json(payload);
+    }
+}
+
+async function handleTaskStatus(req: VercelRequest, res: VercelResponse, origin?: string) {
+    try {
+        authenticate(req as AuthenticatedRequest);
+        const { taskId, status } = req.body;
+
+        if (!taskId || !status || !['pending', 'in_progress', 'completed'].includes(status)) {
+            setCorsHeaders(res, origin);
+            return res.status(400).json(handleError(new Error('Invalid taskId or status')).payload);
+        }
+
+        const task = await prisma.eventTask.update({
+            where: { id: taskId },
+            data: { status }
+        });
+
+        setCorsHeaders(res, origin);
+        return res.status(200).json(successResponse({ ...task, _id: task.id }, 'Task status updated'));
     } catch (error: any) {
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);
