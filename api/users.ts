@@ -36,6 +36,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
     if (req.method === 'PUT') {
         if (action === 'change-password') return handleChangePassword(req, res, origin);
+        if (req.body && typeof req.body.id === 'string') return handleAdminUpdateUser(req, res, origin);
         return handleUpdateProfile(req, res, origin);
     }
     if (req.method === 'PATCH') return handleAdminUpdateUser(req, res, origin);
