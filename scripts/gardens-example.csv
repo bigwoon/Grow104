@@ -1,4 +1,0 @@
-name,address,zipcode,ownerEmail,description,latitude,longitude,vegetables
-"Community Garden 1","123 Main St","12345","admin@grow104.org","A beautiful community garden",40.7128,-74.0060,"Tomatoes,Lettuce,Carrots"
-"Urban Farm","456 Oak Ave","23456","gardener@example.com","Urban farming space",40.7589,-73.9851,"Peppers,Cucumbers,Squash"
-"School Garden","789 Elm St","34567","teacher@school.edu","Educational garden for students",40.7306,-73.9352,"Beans,Peas,Radishes"

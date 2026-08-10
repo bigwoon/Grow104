@@ -2,6 +2,20 @@
 .env
 .env.local
 .env.production
+.env*.local
+
+# Agent skills & internal docs
+.agents/
+.cursor/
+scripts/
+docs/
+PowerShell
+*.ps1
+*.json
+!package.json
+!package-lock.json
+!vercel.json
+!tsconfig.json
 
 # Dependencies
 node_modules/
@@ -11,24 +25,23 @@ yarn.lock
 # Build output
 dist/
 .vercel/
+.vercel
 
-# IDE
+# IDE & OS
 .vscode/
 .idea/
 *.swp
 *.swo
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Logs
+# Logs & temp files
 *.log
+*.txt
+*.csv
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
 # Prisma
 prisma/migrations/*_migration.sql
-.vercel
-.env*.local
