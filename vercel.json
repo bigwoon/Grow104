@@ -134,6 +134,10 @@
       "destination": "/api/events?action=unregister&id=:id"
     },
     {
+      "source": "/api/events/:id",
+      "destination": "/api/events?id=:id"
+    },
+    {
       "source": "/api/invitations/token/:token",
       "destination": "/api/invitations?action=token&token=:token"
     },

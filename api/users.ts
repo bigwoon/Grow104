@@ -489,7 +489,7 @@ async function handleNotifications(req: VercelRequest, res: VercelResponse, orig
             }));
         }
 
-        if (req.method === 'PUT' && id && typeof id === 'string' && action === 'read') {
+        if (req.method === 'PUT' && id && typeof id === 'string') {
             const updated = await prisma.notification.update({
                 where: { id, userId: user.id },
                 data: { isRead: true }
