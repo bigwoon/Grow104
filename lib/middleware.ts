@@ -42,7 +42,9 @@ export const authenticate = (req: AuthenticatedRequest) => {
  * @throws Error if user doesn't have required role
  */
 export const requireRole = (user: { role: string }, allowedRoles: string[]) => {
-    if (!allowedRoles.includes(user.role)) {
+    const userRole = (user.role || '').toLowerCase();
+    const allowed = allowedRoles.map(r => r.toLowerCase());
+    if (!allowed.includes(userRole)) {
         throw new Error('INSUFFICIENT_PERMISSIONS');
     }
 };
@@ -77,7 +79,7 @@ export const validateRequest = <T>(schema: z.ZodSchema<T>, data: any): T => {
  */
 export const requireGardenAccess = async (userId: string, gardenId: string, role: string) => {
     // Admins have access to all gardens
-    if (role === 'Admin') {
+    if (role.toLowerCase() === 'admin') {
         return;
     }
 

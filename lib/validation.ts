@@ -46,29 +46,60 @@ export const GardenInvitationCreateSchema = z.object({
 });
 
 // ============================================
+// GARDEN SCHEMAS
+// ============================================
+
+export const GardenCreateSchema = z.object({
+    name: z.string().min(1).max(200),
+    address: z.string().min(1).max(500),
+    zipcode: z.string().regex(/^\d{5}$/, 'Invalid zipcode format'),
+    description: z.string().max(2000).optional(),
+    plotSize: z.string().max(100).optional(),
+    sunlight: z.enum(['full', 'partial', 'shade']).optional(),
+});
+
+export const GardenUpdateSchema = z.object({
+    name: z.string().min(1).max(200).optional(),
+    address: z.string().min(1).max(500).optional(),
+    zipcode: z.string().regex(/^\d{5}$/, 'Invalid zipcode format').optional(),
+    description: z.string().max(2000).optional().nullable(),
+    plotSize: z.string().max(100).optional().nullable(),
+    sunlight: z.enum(['full', 'partial', 'shade']).optional().nullable(),
+    status: z.enum(['active', 'planning', 'maintenance']).optional(),
+});
+
+// ============================================
 // INVENTORY SCHEMAS
 // ============================================
 
 export const SupplyCreateSchema = z.object({
     name: z.string().min(1).max(200),
-    category: z.string().min(1).max(100),
+    category: z.string().min(1).max(100).optional().default('Other'),
+    description: z.string().max(2000).optional(),
+    quantity: z.number().int().nonnegative().optional(),
+    unit: z.string().max(50).optional(),
     available: z.boolean().default(true),
 });
 
 export const SupplyUpdateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
     category: z.string().min(1).max(100).optional(),
+    description: z.string().max(2000).optional().nullable(),
+    quantity: z.number().int().nonnegative().optional().nullable(),
+    unit: z.string().max(50).optional().nullable(),
     available: z.boolean().optional(),
 });
 
 export const SeedlingCreateSchema = z.object({
     name: z.string().min(1).max(200),
+    description: z.string().max(2000).optional(),
     season: z.enum(['spring', 'fall', 'both']),
     available: z.boolean().default(true),
 });
 
 export const SeedlingUpdateSchema = z.object({
     name: z.string().min(1).max(200).optional(),
+    description: z.string().max(2000).optional().nullable(),
     season: z.enum(['spring', 'fall', 'both']).optional(),
     available: z.boolean().optional(),
 });
@@ -79,21 +110,23 @@ export const SeedlingUpdateSchema = z.object({
 
 export const EventCreateSchema = z.object({
     title: z.string().min(1).max(200),
-    type: z.enum(['harvest', 'planting', 'community']),
-    description: z.string().min(1).max(2000),
+    type: z.enum(['harvest', 'planting', 'community', 'workshop', 'cleanup', 'social', 'training']),
+    description: z.string().max(2000).optional(),
     gardenId: z.string().uuid(),
     date: z.string().datetime(),
-    startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
-    endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/),
+    time: z.string().optional(),
+    startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
+    endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
     location: z.string().max(500).optional(),
     maxParticipants: z.number().int().positive().optional(),
 });
 
 export const EventUpdateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
-    type: z.enum(['harvest', 'planting', 'community']).optional(),
-    description: z.string().min(1).max(2000).optional(),
+    type: z.enum(['harvest', 'planting', 'community', 'workshop', 'cleanup', 'social', 'training']).optional(),
+    description: z.string().max(2000).optional(),
     date: z.string().datetime().optional(),
+    time: z.string().optional(),
     startTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
     endTime: z.string().regex(/^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$/).optional(),
     location: z.string().max(500).optional().nullable(),
@@ -106,7 +139,7 @@ export const EventUpdateSchema = z.object({
 
 export const MessageCreateSchema = z.object({
     toUserId: z.string().uuid(),
-    subject: z.string().min(1).max(200),
+    subject: z.string().min(1).max(200).optional(),
     content: z.string().min(1).max(5000),
     requestType: z.string().max(100).optional(),
 });
@@ -117,14 +150,14 @@ export const MessageCreateSchema = z.object({
 
 export const ReportCreateSchema = z.object({
     gardenId: z.string().uuid().optional(),
-    title: z.string().min(1).max(200),
-    content: z.string().min(1).max(5000),
-    type: z.string().min(1).max(100),
+    title: z.string().min(1).max(200).optional(),
+    content: z.string().min(1).max(5000).optional(),
+    type: z.string().min(1).max(100).optional(),
     activityType: z.string().min(1).max(100),
     description: z.string().min(1).max(2000),
     hoursWorked: z.number().positive().optional(),
     rating: z.number().int().min(1).max(5).optional(),
-    visitDate: z.string().datetime().optional(),
+    visitDate: z.string().optional(),
     notes: z.string().max(2000).optional(),
 });
 
@@ -137,14 +170,26 @@ export const VolunteerRequestCreateSchema = z.object({
     title: z.string().min(1).max(200),
     description: z.string().min(1).max(2000),
     date: z.string().datetime(),
-    status: z.enum(['open', 'filled', 'cancelled']).default('open'),
+    time: z.string().max(100).optional(),
+    location: z.string().max(500).optional(),
+    task: z.string().max(500).optional(),
+    maxVolunteers: z.number().int().positive().default(1),
+    skills: z.array(z.string()).optional(),
+    priority: z.enum(['low', 'medium', 'high']).default('medium'),
+    status: z.enum(['open', 'in_progress', 'completed', 'cancelled']).default('open'),
 });
 
 export const VolunteerRequestUpdateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
     description: z.string().min(1).max(2000).optional(),
     date: z.string().datetime().optional(),
-    status: z.enum(['open', 'filled', 'cancelled']).optional(),
+    time: z.string().max(100).optional().nullable(),
+    location: z.string().max(500).optional().nullable(),
+    task: z.string().max(500).optional().nullable(),
+    maxVolunteers: z.number().int().positive().optional(),
+    skills: z.array(z.string()).optional(),
+    priority: z.enum(['low', 'medium', 'high']).optional(),
+    status: z.enum(['open', 'in_progress', 'completed', 'cancelled']).optional(),
 });
 
 // ============================================
@@ -152,22 +197,27 @@ export const VolunteerRequestUpdateSchema = z.object({
 // ============================================
 
 export const GardenerRequestCreateSchema = z.object({
-    title: z.string().min(1).max(200),
-    description: z.string().min(1).max(2000),
-    requestType: z.enum(['supplies', 'seedlings', 'food-utility', 'volunteer-help']),
+    title: z.string().min(1).max(200).optional(),
+    description: z.string().max(2000).optional(),
+    requestType: z.enum(['supplies', 'seedlings', 'food-utility', 'volunteer-help']).optional(), // Optional to allow inference
     status: z.enum(['pending', 'approved', 'rejected', 'completed']).default('pending'),
 
     // Supplies
-    supplyIds: z.array(z.string().uuid()).optional(),
+    supplyIds: z.array(z.string()).optional(), // Relaxed to allow names
+    items: z.array(z.string()).optional(), // Alias for supplyIds from frontend
 
     // Seedlings
-    seedlingIds: z.array(z.string().uuid()).optional(),
+    // Relaxed validation to allow vegetable names (strings) instead of just UUIDs
+    // Frontend sends names like "Carrots", "Beans" etc.
+    seedlingIds: z.array(z.string()).optional(),
+    vegetables: z.array(z.string()).optional(), // Alias for seedlingIds from frontend
     season: z.enum(['spring', 'fall', 'both']).optional(),
     quantity: z.number().int().positive().optional(),
 
     // Food/Utility
     assistanceType: z.string().max(100).optional(),
     householdSize: z.number().int().positive().optional(),
+    details: z.string().max(2000).optional(), // Alias for notes/description from frontend
 
     // Volunteer Help
     task: z.string().max(500).optional(),
@@ -205,3 +255,13 @@ export const formatZodError = (error: z.ZodError): ValidationError[] => {
         message: err.message,
     }));
 };
+
+// ============================================
+// ONBOARDING INVITATION SCHEMAS
+// ============================================
+
+export const InvitationCreateSchema = z.object({
+    email: z.string().email().transform(v => v.toLowerCase()),
+    role: z.enum(['Admin', 'Gardener', 'Volunteer']),
+    message: z.string().max(500).optional(),
+});

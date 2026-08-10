@@ -1,7 +1,224 @@
 {
   "functions": {
     "api/**/*.ts": {
-      "runtime": "@vercel/node@3.2.0"
+      "maxDuration": 10
     }
-  }
+  },
+  "rewrites": [
+    {
+      "source": "/api/users/:id",
+      "destination": "/api/users?id=:id"
+    },
+    {
+      "source": "/api/gardener-requests/food-utility",
+      "destination": "/api/requests?type=gardener&action=food-utility"
+    },
+    {
+      "source": "/api/gardener-requests/seedlings",
+      "destination": "/api/requests?type=gardener&action=seedlings"
+    },
+    {
+      "source": "/api/gardener-requests/harvest-tracker-url",
+      "destination": "/api/requests?type=gardener&action=harvest-tracker-url"
+    },
+    {
+      "source": "/api/gardener-requests/:id/status",
+      "destination": "/api/requests?type=gardener&id=:id"
+    },
+    {
+      "source": "/api/gardener-requests/:id",
+      "destination": "/api/requests?type=gardener&id=:id"
+    },
+    {
+      "source": "/api/gardener-requests",
+      "destination": "/api/requests?type=gardener"
+    },
+    {
+      "source": "/api/volunteer-requests/:id/status",
+      "destination": "/api/requests?type=volunteer&id=:id"
+    },
+    {
+      "source": "/api/volunteer-requests/:id",
+      "destination": "/api/requests?type=volunteer&id=:id"
+    },
+    {
+      "source": "/api/volunteer-requests",
+      "destination": "/api/requests?type=volunteer"
+    },
+    {
+      "source": "/api/notifications",
+      "destination": "/api/users?action=notifications"
+    },
+    {
+      "source": "/api/notifications/:id",
+      "destination": "/api/users?action=notifications&id=:id"
+    },
+    {
+      "source": "/api/messages",
+      "destination": "/api/users?action=messages"
+    },
+    {
+      "source": "/api/messages/:id",
+      "destination": "/api/users?action=messages&id=:id"
+    },
+    {
+      "source": "/api/garden-invitations",
+      "destination": "/api/gardens?action=invite"
+    },
+    {
+      "source": "/api/garden-invitations/:id",
+      "destination": "/api/gardens?action=invitation&invitationId=:id"
+    },
+    {
+      "source": "/api/gardens/:id/members",
+      "destination": "/api/gardens?id=:id&action=members"
+    },
+    {
+      "source": "/api/gardens/:id/gardeners",
+      "destination": "/api/gardens?id=:id&action=gardeners"
+    },
+    {
+      "source": "/api/gardens/:id/volunteers",
+      "destination": "/api/gardens?id=:id&action=volunteers"
+    },
+    {
+      "source": "/api/gardens/:id/status",
+      "destination": "/api/gardens?id=:id&action=status"
+    },
+    {
+      "source": "/api/gardens/:id",
+      "destination": "/api/gardens?id=:id"
+    },
+    {
+      "source": "/api/tasks",
+      "destination": "/api/requests?type=task"
+    },
+    {
+      "source": "/api/tasks/:id",
+      "destination": "/api/requests?type=task&id=:id"
+    },
+    {
+      "source": "/api/reports",
+      "destination": "/api/inventory?type=reports"
+    },
+    {
+      "source": "/api/reports/:id",
+      "destination": "/api/inventory?type=reports&id=:id"
+    },
+    {
+      "source": "/api/requests/:id/join",
+      "destination": "/api/requests?type=volunteer&action=join&id=:id"
+    },
+    {
+      "source": "/api/requests/:id/leave",
+      "destination": "/api/requests?type=volunteer&action=leave&id=:id"
+    },
+    {
+      "source": "/api/requests/volunteer/:id",
+      "destination": "/api/requests?type=volunteer&id=:id"
+    },
+    {
+      "source": "/api/requests/gardener/:id",
+      "destination": "/api/requests?type=gardener&id=:id"
+    },
+    {
+      "source": "/api/gardener-requests/:action",
+      "destination": "/api/requests?type=gardener&action=:action"
+    },
+    {
+      "source": "/api/events/:id/register",
+      "destination": "/api/events?action=register&id=:id"
+    },
+    {
+      "source": "/api/events/:id/unregister",
+      "destination": "/api/events?action=unregister&id=:id"
+    },
+    {
+      "source": "/api/invitations/token/:token",
+      "destination": "/api/invitations?action=token&token=:token"
+    },
+    {
+      "source": "/api/invitations/:id",
+      "destination": "/api/invitations?id=:id"
+    },
+    {
+      "source": "/api/invitations",
+      "destination": "/api/invitations"
+    },
+    {
+      "source": "/api/inventory/requests/:id/status",
+      "destination": "/api/requests?type=gardener&id=:id"
+    },
+    {
+      "source": "/api/inventory/requests/:id",
+      "destination": "/api/requests?type=gardener&id=:id"
+    },
+    {
+      "source": "/api/inventory/requests",
+      "destination": "/api/requests?type=gardener&requestType=supplies"
+    },
+    {
+      "source": "/api/supplies",
+      "destination": "/api/inventory?type=supplies"
+    },
+    {
+      "source": "/api/seedlings",
+      "destination": "/api/inventory?type=seedlings"
+    },
+    {
+      "source": "/api/stats",
+      "destination": "/api/stats"
+    },
+    {
+      "source": "/api/auth/login",
+      "destination": "/api/auth?action=login"
+    },
+    {
+      "source": "/api/auth/signup",
+      "destination": "/api/auth?action=signup"
+    }
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "https://www.grow104.org"
+        },
+        {
+          "key": "Access-Control-Allow-Credentials",
+          "value": "true"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET,OPTIONS,PATCH,DELETE,POST,PUT"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, Authorization"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "DENY"
+        },
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "Strict-Transport-Security",
+          "value": "max-age=31536000; includeSubDomains; preload"
+        },
+        {
+          "key": "Content-Security-Policy",
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com; connect-src 'self' https://*.vercel.app https://grow104-snowy.vercel.app https://sc-garden-app.vercel.app https://www.grow104.org https://grow104.org http://localhost:*"
+        }
+      ]
+    }
+  ]
 }

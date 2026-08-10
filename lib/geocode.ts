@@ -1,5 +1,5 @@
 /**
- * Nominatim Geocoding Service (OpenStreetMap)
+ * Nominatim Geocoding Service (OpenMapStreet)
  * Free geocoding service for converting addresses to coordinates
  * No API key required - completely free!
  */
@@ -16,7 +16,7 @@ interface NominatimResponse {
 }
 
 /**
- * Geocode an address using Nominatim (OpenStreetMap)
+ * Geocode an address using Nominatim (OpenMapStreet)
  * @param address - Full address string (e.g., "123 Main St, Little Rock, AR 72201")
  * @returns Coordinates object with latitude and longitude
  */
@@ -44,7 +44,7 @@ export const geocodeAddress = async (address: string): Promise<GeocodingResult> 
             throw new Error(`Geocoding API error: ${response.statusText}`);
         }
 
-        const data: NominatimResponse[] = await response.json();
+        const data = await response.json() as NominatimResponse[];
 
         if (!data || data.length === 0) {
             // Return default coordinates (Little Rock, AR) if address not found
@@ -98,7 +98,7 @@ export const reverseGeocode = async (latitude: number, longitude: number): Promi
             throw new Error(`Reverse geocoding API error: ${response.statusText}`);
         }
 
-        const data: NominatimResponse = await response.json();
+        const data = await response.json() as NominatimResponse;
 
         return data.display_name || 'Address not found';
     } catch (error: any) {

@@ -2,169 +2,185 @@
  * Get CORS origin based on request
  * Allows production domain and localhost for development
  */
-const getAllowedOrigin = (origin?: string): string => {
-    // Use FRONTEND_URL from environment variables
-    const productionUrl = process.env.FRONTEND_URL || 'https://www.grow104.org';
+/**
+ * Get CORS origin based on request
+ * Allows production domain and localhost for development
+ */
+export const getAllowedOrigin = (origin?: string | string[]): string => {
+    // Prefer explicit env var, fall back to canonical www form
+    const defaultOrigin = process.env.FRONTEND_URL || 'https://www.grow104.org';
+
+    // If multiple origins are provided (though rare in headers), take the first one
+    const checkOrigin = Array.isArray(origin) ? origin[0] : origin;
+
+    if (!checkOrigin) return defaultOrigin;
+
+    // Normalize: remove trailing slash and convert to lowercase
+    const normalizedOrigin = checkOrigin.replace(/\/$/, '').toLowerCase();
 
     const allowedOrigins = [
-        productionUrl,                      // Primary production URL (with www)
-        'https://www.grow104.org',          // Production with www
-        'https://grow104.org',              // Production without www
-        'http://localhost:3000',            // Local dev (React default)
+        'https://www.grow104.org',   // canonical production (with www)
+        'https://grow104.org',        // production (without www)
+        'https://grow104-snowy.vercel.app', // current backend deployment
+        'https://sc-garden-app.vercel.app', // legacy backend fallback
+        'http://localhost:3000',
         'https://localhost:3000',
-        'http://localhost:5173',            // Local dev (Vite default)
+        'http://localhost:5173',
         'https://localhost:5173',
-        'http://localhost:5174',            // Local dev (Vite alternate)
+        'http://localhost:5174',
         'https://localhost:5174',
-        'http://127.0.0.1:3000',            // Local dev (IP)
+        'http://127.0.0.1:3000',
         'https://127.0.0.1:3000'
-    ];
+    ].map(o => o.toLowerCase());
 
-    if (origin && allowedOrigins.includes(origin)) {
-        return origin;
+    if (allowedOrigins.includes(normalizedOrigin)) {
+        return checkOrigin; // Echo back the exact origin the browser sent
     }
 
     // Allow any localhost origin in development
-    if (origin && (origin.includes('localhost') || origin.includes('127.0.0.1'))) {
-        return origin;
+    if (normalizedOrigin.includes('localhost') || normalizedOrigin.includes('127.0.0.1')) {
+        return checkOrigin;
     }
 
-    // Default to production domain
-    return productionUrl;
+    // Allow Vercel preview deployments
+    if (normalizedOrigin.endsWith('.vercel.app')) {
+        return checkOrigin;
+    }
+
+    return defaultOrigin;
 };
 
 /**
- * Standardized success response
+ * Set standardized CORS headers for Vercel response
  */
-export const successResponse = (data: any, message?: string, origin?: string) => {
+export const setCorsHeaders = (res: any, origin?: string | string[]) => {
+    res.setHeader('Access-Control-Allow-Origin', getAllowedOrigin(origin));
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Max-Age', '86400');
+    res.setHeader('Vary', 'Origin');
+};
+
+/**
+ * Standardized success response payload
+ */
+export const successResponse = (data: any, message?: string) => {
     return {
-        statusCode: 200,
-        headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': getAllowedOrigin(origin),
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Allow-Credentials': 'true'
-        },
-        body: JSON.stringify({
-            success: true,
-            data,
-            ...(message && { message })
-        })
+        success: true,
+        data,
+        ...(message && { message })
     };
 };
 
 /**
- * Standardized error response
+ * Standardized error response payload
  */
-export const errorResponse = (error: string, statusCode: number = 500, origin?: string) => {
+export const errorResponse = (error: string, statusCode: number = 500) => {
     return {
-        statusCode,
-        headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': getAllowedOrigin(origin),
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Allow-Credentials': 'true'
-        },
-        body: JSON.stringify({
-            success: false,
-            error,
-            statusCode
-        })
+        success: false,
+        error,
+        statusCode
     };
 };
 
 /**
  * Map common errors to appropriate status codes and messages
  */
-export const handleError = (error: any, origin?: string) => {
+export const handleError = (error: any) => {
     // Zod validation errors
-    if (error.name === 'ZodError') {
-        const validationErrors = error.errors.map((err: any) => ({
+    if (error.name === 'ZodError' || error.constructor?.name === 'ZodError') {
+        const validationErrors = error.errors?.map((err: any) => ({
             field: err.path.join('.'),
             message: err.message,
-        }));
+        })) || [];
         return {
-            statusCode: 400,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': getAllowedOrigin(origin),
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-                'Access-Control-Allow-Credentials': 'true'
-            },
-            body: JSON.stringify({
+            status: 400,
+            payload: {
                 success: false,
                 error: 'Validation failed',
                 validationErrors,
                 statusCode: 400
-            })
+            }
         };
     }
 
-    // Authentication errors
-    if (error.message === 'NO_TOKEN') {
-        return errorResponse('No authentication token provided', 401, origin);
+    const message = error.message || '';
+
+    // Authentication & Authorization errors
+    if (message === 'NO_TOKEN') {
+        return { status: 401, payload: errorResponse('No authentication token provided', 401) };
     }
-    if (error.message === 'INVALID_TOKEN') {
-        return errorResponse('Invalid or expired token', 401, origin);
+    if (message === 'INVALID_TOKEN' || message.includes('jwt expired')) {
+        return { status: 401, payload: errorResponse('Invalid or expired token', 401) };
     }
-    if (error.message === 'INSUFFICIENT_PERMISSIONS') {
-        return errorResponse('Insufficient permissions', 403, origin);
+    if (message === 'INSUFFICIENT_PERMISSIONS' || message === 'Unauthorized') {
+        return { status: 403, payload: errorResponse('Insufficient permissions', 403) };
     }
 
-    // Business logic errors
-    if (error.message === 'GARDEN_EXISTS_AT_ADDRESS') {
+    // Business logic errors (404s)
+    if (message === 'GARDEN_NOT_FOUND' || message === 'User not found' || message === 'NO_GARDEN_ASSIGNMENT' || message === 'Notification not found' || message === 'Request not found') {
+        return { status: 404, payload: errorResponse(message, 404) };
+    }
+
+    // Conflict errors
+    if (message === 'GARDEN_EXISTS_AT_ADDRESS') {
         return {
-            statusCode: 409,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': getAllowedOrigin(origin),
-                'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-                'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-                'Access-Control-Allow-Credentials': 'true'
-            },
-            body: JSON.stringify({
+            status: 409,
+            payload: {
                 success: false,
                 error: 'GARDEN_EXISTS_AT_ADDRESS',
                 data: error.data
-            })
+            }
         };
     }
 
-    // Validation errors
+    // Prisma errors
     if (error.code === 'P2002') {
-        return errorResponse('A record with this value already exists', 409, origin);
+        return { status: 409, payload: errorResponse('A record with this value already exists', 409) };
     }
-    if (error.code === 'P2025') {
-        return errorResponse('Record not found', 404, origin);
+    if (error.code === 'P2025' || message.includes('Record to delete does not exist')) {
+        return { status: 404, payload: errorResponse('Record not found', 404) };
     }
 
     // Default error
-    console.error('Unhandled error:', error);
-    return errorResponse(error.message || 'Internal server error', 500, origin);
+    console.error('--- UNHANDLED ERROR ---');
+    console.error('Message:', message);
+    console.error('Code:', error.code);
+    console.error('Stack:', error.stack);
+    console.error('-----------------------');
+
+    return { status: 500, payload: errorResponse(message || 'Internal server error', 500) };
+};
+
+/**
+ * Enhanced JSON stringify that handles BigInt AND Prisma Decimal
+ */
+export const safeJsonStringify = (obj: any) => {
+    return JSON.stringify(obj, (key, value) => {
+        // Handle BigInt
+        if (typeof value === 'bigint') {
+            return value.toString();
+        }
+
+        // Handle Prisma/Decimal.js objects (they have a toJSON or d/s properties)
+        if (value && typeof value === 'object' && (value.constructor?.name === 'Decimal' || value._isDecimal)) {
+            return Number(value);
+        }
+
+        return value;
+    });
 };
 
 /**
  * Validation error response for Zod errors
  */
-export const validationErrorResponse = (errors: { field: string; message: string }[], origin?: string) => {
+export const validationErrorResponse = (errors: { field: string; message: string }[]) => {
     return {
-        statusCode: 400,
-        headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': getAllowedOrigin(origin),
-            'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-            'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-            'Access-Control-Allow-Credentials': 'true'
-        },
-        body: JSON.stringify({
-            success: false,
-            error: 'Validation failed',
-            validationErrors: errors,
-            statusCode: 400
-        })
+        success: false,
+        error: 'Validation failed',
+        validationErrors: errors,
+        statusCode: 400
     };
 };
 
