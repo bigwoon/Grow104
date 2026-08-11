@@ -166,7 +166,7 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
     try {
         const user = authenticate(req as AuthenticatedRequest);
 
-        const { role, search, status } = req.query;
+        const { role, search, status, isActive } = req.query;
         const { page, limit, skip } = getPaginationParams(req.query);
 
         const where: any = {};
@@ -196,15 +196,17 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
         }
 
         if (role && typeof role === 'string') {
-            // If they are a volunteer and they requested a specific role, we need to AND it with their allowed list
+            const roleClause = { role: { equals: role, mode: 'insensitive' as const } };
             if (currentUserRole === 'volunteer') {
-                where.AND = [{ role }];
+                where.AND = [roleClause];
             } else {
-                where.role = role;
+                where.role = { equals: role, mode: 'insensitive' };
             }
         }
 
-        if (status === 'active') {
+        if (isActive !== undefined) {
+            where.isActive = String(isActive) === 'true';
+        } else if (status === 'active') {
             where.isActive = true;
         } else if (status === 'inactive') {
             where.isActive = false;
