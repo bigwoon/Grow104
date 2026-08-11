@@ -377,7 +377,7 @@ async function handleAdminDeleteUser(req: VercelRequest, res: VercelResponse, or
         const targetUser = await prisma.user.findUnique({ where: { id: targetId } });
         if (!targetUser) {
             setCorsHeaders(res, origin);
-            return res.status(404).json(handleError(new Error('User not found')).payload);
+            return res.status(200).json(successResponse({ success: true }, 'User already removed'));
         }
 
         // Cascade-delete all related records in a transaction to avoid FK constraint violations
@@ -386,6 +386,7 @@ async function handleAdminDeleteUser(req: VercelRequest, res: VercelResponse, or
             prisma.message.deleteMany({ where: { OR: [{ fromUserId: targetId }, { toUserId: targetId }] } }),
             prisma.report.deleteMany({ where: { userId: targetId } }),
             prisma.task.deleteMany({ where: { assignedTo: targetId } }),                // Task.assignedTo → User
+            prisma.eventTask.updateMany({ where: { assignedTo: targetId }, data: { assignedTo: null } }),
             prisma.eventRegistration.deleteMany({ where: { userId: targetId } }),
             prisma.gardenGardener.deleteMany({ where: { userId: targetId } }),
             prisma.gardenVolunteer.deleteMany({ where: { userId: targetId } }),
@@ -402,9 +403,8 @@ async function handleAdminDeleteUser(req: VercelRequest, res: VercelResponse, or
             prisma.user.delete({ where: { id: targetId } }),
         ]);
 
-
         setCorsHeaders(res, origin);
-        return res.status(200).json(successResponse(null, 'User deleted successfully'));
+        return res.status(200).json(successResponse({ success: true }, 'User deleted successfully'));
     } catch (error: any) {
         console.error('[handleAdminDeleteUser] Error:', error.message, error.code);
         setCorsHeaders(res, origin);
