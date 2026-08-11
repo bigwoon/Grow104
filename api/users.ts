@@ -469,27 +469,27 @@ async function handleNotifications(req: VercelRequest, res: VercelResponse, orig
         const user = authenticate(req as AuthenticatedRequest);
 
         if (req.method === 'GET') {
-            const { limit = '20', offset = '0' } = req.query;
-            const [notifications, total] = await Promise.all([
-                prisma.notification.findMany({
-                    where: { userId: user.id },
-                    orderBy: { createdAt: 'desc' },
-                    take: parseInt(limit as string),
-                    skip: parseInt(offset as string)
-                }),
-                prisma.notification.count({ where: { userId: user.id } })
-            ]);
+            const { limit = '50', offset = '0' } = req.query;
+            const parsedLimit = isNaN(parseInt(limit as string)) ? 50 : parseInt(limit as string);
+            const parsedOffset = isNaN(parseInt(offset as string)) ? 0 : parseInt(offset as string);
+
+            const notifications = await prisma.notification.findMany({
+                where: { userId: user.id },
+                orderBy: { createdAt: 'desc' },
+                take: parsedLimit,
+                skip: parsedOffset
+            });
+
+            const formatted = notifications.map(n => ({
+                ...n,
+                _id: n.id
+            }));
 
             setCorsHeaders(res, origin);
-            return res.status(200).json(successResponse({
-                notifications: notifications.map(n => ({ ...n, _id: n.id })),
-                total,
-                limit: parseInt(limit as string),
-                offset: parseInt(offset as string)
-            }));
+            return res.status(200).json(successResponse(formatted, 'Notifications retrieved successfully'));
         }
 
-        if (req.method === 'PUT' && id && typeof id === 'string') {
+        if ((req.method === 'PUT' || req.method === 'PATCH') && id && typeof id === 'string') {
             const updated = await prisma.notification.update({
                 where: { id, userId: user.id },
                 data: { isRead: true }
