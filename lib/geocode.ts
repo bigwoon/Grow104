@@ -22,16 +22,20 @@ interface NominatimResponse {
  */
 export const geocodeAddress = async (address: string): Promise<GeocodingResult> => {
     try {
-        // Nominatim requires a User-Agent header
         const userAgent = 'Grow104GardenApp/1.0 (contact@grow104.org)';
 
-        // Build the API URL
+        // Ensure query always targets Fort Worth, TX 76104 for accuracy
+        let fullQuery = address || '';
+        if (!fullQuery.toLowerCase().includes('fort worth') && !fullQuery.toLowerCase().includes('76104')) {
+            fullQuery = `${address}, Fort Worth, TX 76104`;
+        }
+
         const baseUrl = 'https://nominatim.openstreetmap.org/search';
         const params = new URLSearchParams({
-            q: address,
+            q: fullQuery,
             format: 'json',
             limit: '1',
-            countrycodes: 'us', // Limit to US addresses for better accuracy
+            countrycodes: 'us',
         });
 
         const response = await fetch(`${baseUrl}?${params.toString()}`, {
@@ -47,11 +51,11 @@ export const geocodeAddress = async (address: string): Promise<GeocodingResult> 
         const data = await response.json() as NominatimResponse[];
 
         if (!data || data.length === 0) {
-            // Return default coordinates (Little Rock, AR) if address not found
-            console.warn('No geocoding results found for address:', address);
+            console.warn('No geocoding results found for address:', fullQuery);
+            // Default center fallback for Southside Fort Worth, TX 76104
             return {
-                latitude: 34.7465,
-                longitude: -92.2896,
+                latitude: 32.7300,
+                longitude: -97.3200,
             };
         }
 
@@ -63,10 +67,10 @@ export const geocodeAddress = async (address: string): Promise<GeocodingResult> 
         };
     } catch (error: any) {
         console.error('Geocoding error:', error);
-        // Return default coordinates (Little Rock, AR) on error
+        // Default center fallback for Southside Fort Worth, TX 76104
         return {
-            latitude: 34.7465,
-            longitude: -92.2896,
+            latitude: 32.7300,
+            longitude: -97.3200,
         };
     }
 };
