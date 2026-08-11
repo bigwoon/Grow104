@@ -21,8 +21,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (action === 'task-status') return handleTaskStatus(req, res, origin);
         return handleCreate(req, res, origin);
     }
-    if (req.method === 'PATCH' && action === 'task-status') return handleTaskStatus(req, res, origin);
-    if (req.method === 'PUT' && id && typeof id === 'string') {
+    if ((req.method === 'PUT' || req.method === 'PATCH') && id && typeof id === 'string') {
         if (action === 'task-status') return handleTaskStatus(req, res, origin);
         return handleUpdate(req, res, id, origin);
     }

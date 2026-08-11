@@ -70,19 +70,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleList(req, res, origin);
     }
 
-    if (req.method === 'PUT') {
-        if (action === 'status' && id && typeof id === 'string') return handleStatus(req, res, id, origin);
-        // handleInvitations handles other PUT actions (accept/reject)
-    }
-
     if (req.method === 'POST') {
         if (action === 'gardeners' && id && typeof id === 'string') return handleGardeners(req, res, id, origin);
         if (action === 'volunteers' && id && typeof id === 'string') return handleVolunteers(req, res, id, origin);
+        return handleCreateGarden(req, res, origin);
+    }
+
+    if (req.method === 'PUT' || req.method === 'PATCH') {
+        if (action === 'status' && id && typeof id === 'string') return handleStatus(req, res, id, origin);
+        if (id && typeof id === 'string') return handleUpdateGarden(req, res, id, origin);
     }
 
     if (req.method === 'DELETE') {
         if (action === 'gardeners' && id && typeof id === 'string') return handleGardeners(req, res, id, origin);
         if (action === 'volunteers' && id && typeof id === 'string') return handleVolunteers(req, res, id, origin);
+        if (id && typeof id === 'string') return handleDeleteGarden(req, res, id, origin);
     }
 
     setCorsHeaders(res, origin);
@@ -472,6 +474,136 @@ async function handleStatus(req: VercelRequest, res: VercelResponse, id: string,
 
         setCorsHeaders(res, origin);
         return res.status(200).json(successResponse({ success: true }, 'Garden status updated successfully'));
+    } catch (error: any) {
+        setCorsHeaders(res, origin);
+        const { status, payload } = handleError(error);
+        return res.status(status).json(payload);
+    }
+}
+
+async function handleCreateGarden(req: VercelRequest, res: VercelResponse, origin?: string) {
+    try {
+        const user = authenticate(req as AuthenticatedRequest);
+        if ((user.role || '').toLowerCase() !== 'admin') {
+            setCorsHeaders(res, origin);
+            return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
+        }
+
+        const { name, description, address, zipcode, capacity, ownerId, rules, features, image } = req.body;
+        if (!name || !address) {
+            setCorsHeaders(res, origin);
+            return res.status(400).json(handleError(new Error('Name and address are required')).payload);
+        }
+
+        let latitude: number | null = null;
+        let longitude: number | null = null;
+        try {
+            const coords = await geocodeAddress(address);
+            latitude = coords.latitude;
+            longitude = coords.longitude;
+        } catch (geoErr) {
+            console.warn('[handleCreateGarden] Geocode error:', geoErr);
+        }
+
+        const newGarden = await prisma.garden.create({
+            data: {
+                name,
+                description: description || '',
+                address,
+                zipcode: zipcode || '',
+                plotSize: capacity ? String(capacity) : undefined,
+                status: 'active',
+                ownerId: ownerId || user.id,
+                latitude,
+                longitude,
+            }
+        });
+
+        setCorsHeaders(res, origin);
+        return res.status(201).json(successResponse(transformGarden(newGarden), 'Garden created successfully'));
+    } catch (error: any) {
+        setCorsHeaders(res, origin);
+        const { status, payload } = handleError(error);
+        return res.status(status).json(payload);
+    }
+}
+
+async function handleUpdateGarden(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
+    try {
+        const user = authenticate(req as AuthenticatedRequest);
+        const garden = await prisma.garden.findUnique({ where: { id } });
+        if (!garden) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('Garden not found')).payload);
+        }
+
+        if ((user.role || '').toLowerCase() !== 'admin' && garden.ownerId !== user.id) {
+            setCorsHeaders(res, origin);
+            return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
+        }
+
+        const { name, description, address, zipcode, capacity, status, ownerId } = req.body;
+        const updateData: any = {};
+        if (name) updateData.name = name;
+        if (description !== undefined) updateData.description = description;
+        if (zipcode !== undefined) updateData.zipcode = zipcode;
+        if (capacity !== undefined) updateData.plotSize = String(capacity);
+        if (status) updateData.status = status;
+        if (ownerId) updateData.ownerId = ownerId;
+
+        if (address && address !== garden.address) {
+            updateData.address = address;
+            try {
+                const coords = await geocodeAddress(address);
+                if (coords.latitude && coords.longitude) {
+                    updateData.latitude = coords.latitude;
+                    updateData.longitude = coords.longitude;
+                }
+            } catch (geoErr) {
+                console.warn('[handleUpdateGarden] Geocode error:', geoErr);
+            }
+        }
+
+        const updatedGarden = await prisma.garden.update({
+            where: { id },
+            data: updateData
+        });
+
+        setCorsHeaders(res, origin);
+        return res.status(200).json(successResponse(transformGarden(updatedGarden), 'Garden updated successfully'));
+    } catch (error: any) {
+        setCorsHeaders(res, origin);
+        const { status, payload } = handleError(error);
+        return res.status(status).json(payload);
+    }
+}
+
+async function handleDeleteGarden(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
+    try {
+        const user = authenticate(req as AuthenticatedRequest);
+        if ((user.role || '').toLowerCase() !== 'admin') {
+            setCorsHeaders(res, origin);
+            return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
+        }
+
+        const garden = await prisma.garden.findUnique({ where: { id } });
+        if (!garden) {
+            setCorsHeaders(res, origin);
+            return res.status(200).json(successResponse({ success: true }, 'Garden already deleted'));
+        }
+
+        await prisma.$transaction([
+            prisma.gardenGardener.deleteMany({ where: { gardenId: id } }),
+            prisma.gardenVolunteer.deleteMany({ where: { gardenId: id } }),
+            prisma.gardenInvitation.deleteMany({ where: { gardenId: id } }),
+            prisma.report.deleteMany({ where: { gardenId: id } }),
+            prisma.volunteerRequest.deleteMany({ where: { gardenId: id } }),
+            prisma.event.deleteMany({ where: { gardenId: id } }),
+            prisma.garden.delete({ where: { id } })
+        ]);
+
+        setCorsHeaders(res, origin);
+        return res.status(200).json(successResponse({ success: true }, 'Garden deleted successfully'));
     } catch (error: any) {
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);
