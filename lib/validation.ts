@@ -119,6 +119,7 @@ export const EventTaskSchema = z.object({
 export const EventCreateSchema = z.object({
     title: z.string().min(1).max(200),
     type: z.enum(['harvest', 'planting', 'community', 'workshop', 'cleanup', 'social', 'training']),
+    status: z.enum(['upcoming', 'in_progress', 'completed']).default('upcoming'),
     description: z.string().max(2000).optional(),
     gardenId: z.string().uuid(),
     date: z.string().optional(),
@@ -134,6 +135,7 @@ export const EventCreateSchema = z.object({
 export const EventUpdateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
     type: z.enum(['harvest', 'planting', 'community', 'workshop', 'cleanup', 'social', 'training']).optional(),
+    status: z.enum(['upcoming', 'in_progress', 'completed']).optional(),
     description: z.string().max(2000).optional(),
     date: z.string().optional(),
     time: z.string().optional(),
@@ -178,7 +180,7 @@ export const ReportCreateSchema = z.object({
 // ============================================
 
 export const VolunteerRequestCreateSchema = z.object({
-    gardenId: z.string().uuid(),
+    gardenId: z.string().uuid().optional(),
     title: z.string().min(1).max(200),
     description: z.string().min(1).max(2000),
     date: z.string().datetime(),
@@ -211,7 +213,7 @@ export const VolunteerRequestUpdateSchema = z.object({
 export const GardenerRequestCreateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
     description: z.string().max(2000).optional(),
-    requestType: z.enum(['supplies', 'seedlings', 'food-utility', 'volunteer-help']).optional(), // Optional to allow inference
+    requestType: z.enum(['supplies', 'seedlings', 'food-utility', 'volunteer-help', 'workshop', 'cleanup', 'planting', 'harvest', 'social', 'training', 'community']).optional(), // Optional to allow inference
     status: z.enum(['pending', 'approved', 'rejected', 'completed']).default('pending'),
 
     // Supplies
@@ -240,7 +242,7 @@ export const GardenerRequestCreateSchema = z.object({
 export const GardenerRequestUpdateSchema = z.object({
     title: z.string().min(1).max(200).optional(),
     description: z.string().min(1).optional(),
-    requestType: z.enum(['supplies', 'seedlings', 'food-utility', 'volunteer-help']).optional(),
+    requestType: z.enum(['supplies', 'seedlings', 'food-utility', 'volunteer-help', 'workshop', 'cleanup', 'planting', 'harvest', 'social', 'training', 'community']).optional(),
     supplyIds: z.array(z.string()).optional(),
     seedlingIds: z.array(z.string()).optional(),
     season: z.string().optional(),

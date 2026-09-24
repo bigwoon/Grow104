@@ -1,15 +1,19 @@
 import { Redis } from '@upstash/redis';
 
 let redis: Redis | null = null;
+const memoryStore = new Map<string, { count: number; resetAt: number }>();
+
 try {
     if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
         redis = new Redis({
             url: process.env.UPSTASH_REDIS_REST_URL,
             token: process.env.UPSTASH_REDIS_REST_TOKEN,
         });
+    } else {
+        console.warn('[Rate Limit] UPSTASH_REDIS_REST_URL not configured. Using in-memory fallback rate limiter.');
     }
 } catch (err) {
-    console.error('[Rate Limit] Failed to initialize Redis client:', err);
+    console.error('[Rate Limit] Failed to initialize Redis client, falling back to memory store:', err);
 }
 
 /**
@@ -25,7 +29,18 @@ export async function checkRateLimit(
     windowSeconds: number = 60
 ): Promise<{ allowed: boolean; remaining: number }> {
     if (!redis) {
-        return { allowed: true, remaining: maxRequests };
+        const now = Date.now();
+        const entry = memoryStore.get(identifier);
+
+        if (!entry || now > entry.resetAt) {
+            memoryStore.set(identifier, { count: 1, resetAt: now + windowSeconds * 1000 });
+            return { allowed: true, remaining: Math.max(0, maxRequests - 1) };
+        }
+
+        entry.count += 1;
+        const allowed = entry.count <= maxRequests;
+        const remaining = Math.max(0, maxRequests - entry.count);
+        return { allowed, remaining };
     }
 
     const key = `rate-limit:${identifier}`;
@@ -55,7 +70,10 @@ export async function checkRateLimit(
  * Useful for testing or manual unlocking
  */
 export async function resetRateLimit(identifier: string): Promise<void> {
-    if (!redis) return;
+    if (!redis) {
+        memoryStore.delete(identifier);
+        return;
+    }
     const key = `rate-limit:${identifier}`;
     try {
         await redis.del(key);

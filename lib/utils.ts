@@ -95,3 +95,9 @@ export const getAdminIds = async (): Promise<string[]> => {
 
     return admins.map(a => a.id);
 };
+
+/**
+ * Standard bcrypt salt rounds used across all auth and user hashing operations
+ */
+export const BCRYPT_SALT_ROUNDS = 10;
+

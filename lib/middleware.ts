@@ -1,14 +1,27 @@
-import { VercelRequest } from '@vercel/node';
+import { VercelRequest, VercelResponse } from '@vercel/node';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import prisma from './prisma';
+import { handleError, setCorsHeaders } from './response';
+import { handleCorsPreflightRequest } from './cors';
 
 export interface AuthenticatedRequest extends VercelRequest {
     user?: {
         id: string;
         email: string;
         role: string;
+        name?: string;
     };
+}
+
+/** JWT payload shape signed by this backend */
+interface JwtPayload {
+    id: string;
+    email: string;
+    role: string;
+    name?: string;
+    iat?: number;
+    exp?: number;
 }
 
 /**
@@ -25,11 +38,12 @@ export const authenticate = (req: AuthenticatedRequest) => {
     const token = authHeader.replace('Bearer ', '');
 
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as any;
+        const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload; // Bug #9: typed, not any
         req.user = {
             id: decoded.id,
             email: decoded.email,
-            role: decoded.role
+            role: decoded.role,
+            name: decoded.name
         };
         return req.user;
     } catch (error) {
@@ -109,3 +123,42 @@ export const requireGardenAccess = async (userId: string, gardenId: string, role
         throw new Error('INSUFFICIENT_PERMISSIONS');
     }
 };
+
+/**
+ * Declarative authentication and authorization wrapper for Vercel Serverless Functions.
+ * Handles CORS preflight, JWT validation, database fallback for roles, and automated error handling.
+ */
+export function withAuth(allowedRoles?: string[]) {
+    return (handler: (req: AuthenticatedRequest, res: VercelResponse, user: { id: string; email: string; role: string }) => Promise<any>) => {
+        return async (req: VercelRequest, res: VercelResponse) => {
+            const origin = req.headers.origin;
+            if (req.method === 'OPTIONS') {
+                return handleCorsPreflightRequest(req, res, origin);
+            }
+            try {
+                const user = authenticate(req as AuthenticatedRequest);
+
+                // Centralized DB fallback if role is missing in legacy tokens
+                if (!user.role && user.id) {
+                    const dbUser = await prisma.user.findUnique({
+                        where: { id: user.id },
+                        select: { role: true }
+                    });
+                    if (dbUser) {
+                        user.role = dbUser.role;
+                    }
+                }
+
+                if (allowedRoles && allowedRoles.length > 0) {
+                    requireRole(user, allowedRoles);
+                }
+
+                return await handler(req as AuthenticatedRequest, res, user);
+            } catch (error: any) {
+                setCorsHeaders(res, origin);
+                const { status, payload } = handleError(error);
+                return res.status(status).json(payload);
+            }
+        };
+    };
+}

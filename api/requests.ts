@@ -152,6 +152,7 @@ async function handleGardenerCreate(req: VercelRequest, res: VercelResponse, ori
             description: descriptionValue,
             requestType: (data.requestType || requestType) as string,
             status: 'pending',
+            task: data.task || null,
 
             // Map specific fields based on type
             ...(requestType === 'supplies' && { supplyIds: supplyIds }),
@@ -164,7 +165,6 @@ async function handleGardenerCreate(req: VercelRequest, res: VercelResponse, ori
                 assistanceType: data.assistanceType,
                 householdSize: data.householdSize
             }),
-            ...(requestType === 'volunteer-help' && { task: data.task }),
 
             notes: data.notes
         };
@@ -291,7 +291,11 @@ async function handleGardenerUpdate(req: VercelRequest, res: VercelResponse, id:
         const user = authenticate(req as AuthenticatedRequest);
         const userRole = (user.role || '').toLowerCase();
         const existing = await prisma.gardenerRequest.findUnique({ where: { id } });
-        if (!existing || (userRole !== 'admin' && existing.requesterId !== user.id)) {
+        if (!existing) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('Request not found')).payload);
+        }
+        if (userRole !== 'admin' && existing.requesterId !== user.id) {
             setCorsHeaders(res, origin);
             return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
         }
@@ -317,7 +321,11 @@ async function handleGardenerDelete(req: VercelRequest, res: VercelResponse, id:
         const user = authenticate(req as AuthenticatedRequest);
         const userRole = (user.role || '').toLowerCase();
         const existing = await prisma.gardenerRequest.findUnique({ where: { id } });
-        if (!existing || (userRole !== 'admin' && existing.requesterId !== user.id)) {
+        if (!existing) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('Request not found')).payload);
+        }
+        if (userRole !== 'admin' && existing.requesterId !== user.id) {
             setCorsHeaders(res, origin);
             return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
         }
@@ -377,7 +385,15 @@ async function handleVolunteerCreate(req: VercelRequest, res: VercelResponse, or
     try {
         const user = authenticate(req as AuthenticatedRequest);
         const data = validateRequest(VolunteerRequestCreateSchema, req.body);
-        let gId = data.gardenId || ((user.role || '').toLowerCase() === 'gardener' ? (await getGardenerGarden(user.id)).id : null);
+        let gId: string | null = data.gardenId || null;
+        if (!gId && (user.role || '').toLowerCase() === 'gardener') {
+            try {
+                const g = await getGardenerGarden(user.id);
+                gId = g?.id || null;
+            } catch {
+                gId = null;
+            }
+        }
         if (!gId) {
             setCorsHeaders(res, origin);
             return res.status(400).json(handleError(new Error('Garden ID required')).payload);
@@ -400,12 +416,32 @@ async function handleVolunteerCreate(req: VercelRequest, res: VercelResponse, or
 async function handleVolunteerJoin(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
+
+        // Check if already assigned
+        const existing = await prisma.volunteerAssignment.findUnique({
+            where: { requestId_userId: { requestId: id, userId: user.id } }
+        });
+        if (existing) {
+            setCorsHeaders(res, origin);
+            return res.status(400).json(handleError(new Error('Already joined this request')).payload);
+        }
+
         const request = await prisma.volunteerRequest.findUnique({ where: { id }, include: { _count: { select: { assignments: true } } } });
         if (!request || request.status !== 'open' || request._count.assignments >= request.maxVolunteers) {
             setCorsHeaders(res, origin);
-            return res.status(400).json(handleError(new Error('Cannot join')).payload);
+            return res.status(400).json(handleError(new Error('Cannot join request')).payload);
         }
-        await prisma.volunteerAssignment.create({ data: { requestId: id, userId: user.id } });
+
+        try {
+            await prisma.volunteerAssignment.create({ data: { requestId: id, userId: user.id } });
+        } catch (createErr: any) {
+            if (createErr.code === 'P2002') {
+                setCorsHeaders(res, origin);
+                return res.status(400).json(handleError(new Error('Already joined this request')).payload);
+            }
+            throw createErr;
+        }
+
         if (request._count.assignments + 1 >= request.maxVolunteers) {
             await prisma.volunteerRequest.update({ where: { id }, data: { status: 'in_progress' } });
         }
@@ -421,11 +457,17 @@ async function handleVolunteerJoin(req: VercelRequest, res: VercelResponse, id: 
 async function handleVolunteerLeave(req: VercelRequest, res: VercelResponse, id: string, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
-        await prisma.volunteerAssignment.delete({ where: { requestId_userId: { requestId: id, userId: user.id } } });
-        const request = await prisma.volunteerRequest.findUnique({ where: { id }, include: { _count: { select: { assignments: true } } } });
-        if (request && request.status === 'in_progress' && request._count.assignments < request.maxVolunteers) {
-            await prisma.volunteerRequest.update({ where: { id }, data: { status: 'open' } });
+        const result = await prisma.volunteerAssignment.deleteMany({
+            where: { requestId: id, userId: user.id }
+        });
+
+        if (result.count > 0) {
+            const request = await prisma.volunteerRequest.findUnique({ where: { id }, include: { _count: { select: { assignments: true } } } });
+            if (request && request.status === 'in_progress' && request._count.assignments < request.maxVolunteers) {
+                await prisma.volunteerRequest.update({ where: { id }, data: { status: 'open' } });
+            }
         }
+
         setCorsHeaders(res, origin);
         return res.status(200).json(successResponse({ success: true }));
     } catch (error: any) {
@@ -439,7 +481,11 @@ async function handleVolunteerUpdate(req: VercelRequest, res: VercelResponse, id
     try {
         const user = authenticate(req as AuthenticatedRequest);
         const existing = await prisma.volunteerRequest.findUnique({ where: { id } });
-        if (!existing || ((user.role || '').toLowerCase() !== 'admin' && existing.requesterId !== user.id)) {
+        if (!existing) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('Request not found')).payload);
+        }
+        if ((user.role || '').toLowerCase() !== 'admin' && existing.requesterId !== user.id) {
             setCorsHeaders(res, origin);
             return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
         }
@@ -470,7 +516,11 @@ async function handleVolunteerDelete(req: VercelRequest, res: VercelResponse, id
     try {
         const user = authenticate(req as AuthenticatedRequest);
         const existing = await prisma.volunteerRequest.findUnique({ where: { id } });
-        if (!existing || ((user.role || '').toLowerCase() !== 'admin' && existing.requesterId !== user.id)) {
+        if (!existing) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('Request not found')).payload);
+        }
+        if ((user.role || '').toLowerCase() !== 'admin' && existing.requesterId !== user.id) {
             setCorsHeaders(res, origin);
             return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
         }

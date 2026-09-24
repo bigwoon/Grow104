@@ -21,6 +21,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return handleGetReports(req, res, origin);
     }
 
+    if (req.method === 'DELETE') {
+        return handleDeleteReport(req, res, origin);
+    }
+
     setCorsHeaders(res, origin);
     return res.status(405).json(handleError(new Error('Method not allowed')).payload);
 }
@@ -76,12 +80,54 @@ async function handleCreateReport(req: VercelRequest, res: VercelResponse, origi
 async function handleGetReports(req: VercelRequest, res: VercelResponse, origin?: string) {
     try {
         const user = authenticate(req as AuthenticatedRequest);
-        const { gardenId, type, userId } = req.query;
+        const { gardenId, type, userId, id } = req.query;
+
+        // If 'id' is provided in query, fetch and return a single report object
+        if (id && typeof id === 'string') {
+            const report = await prisma.report.findUnique({
+                where: { id },
+                include: {
+                    user: {
+                        select: { id: true, name: true, avatarUrl: true, role: true }
+                    },
+                    garden: {
+                        select: { id: true, name: true, address: true }
+                    }
+                }
+            });
+
+            if (!report) {
+                setCorsHeaders(res, origin);
+                return res.status(404).json(handleError(new Error('Report not found')).payload);
+            }
+
+            const isVolunteer = (user.role || '').toLowerCase() === 'volunteer';
+            if (isVolunteer && report.userId !== user.id) {
+                setCorsHeaders(res, origin);
+                return res.status(403).json(handleError(new Error('Unauthorized access to report')).payload);
+            }
+
+            setCorsHeaders(res, origin);
+            return res.status(200).json(successResponse({
+                ...report,
+                _id: report.id,
+                volunteer: report.user,
+                volunteerName: report.user?.name || 'Unknown Volunteer',
+                gardenName: report.garden?.name || 'N/A'
+            }));
+        }
 
         const where: any = {};
         if (gardenId && typeof gardenId === 'string') where.gardenId = gardenId;
         if (type && typeof type === 'string') where.type = type;
-        if (userId && typeof userId === 'string') where.userId = userId;
+
+        // Volunteers can only view their own reports
+        const isVolunteer = (user.role || '').toLowerCase() === 'volunteer';
+        if (isVolunteer) {
+            where.userId = user.id;
+        } else if (userId && typeof userId === 'string') {
+            where.userId = userId;
+        }
 
         const reports = await prisma.report.findMany({
             where,
@@ -107,6 +153,38 @@ async function handleGetReports(req: VercelRequest, res: VercelResponse, origin?
         }));
 
         return res.status(200).json(successResponse(formattedReports));
+    } catch (error: any) {
+        setCorsHeaders(res, origin);
+        const { status, payload } = handleError(error);
+        return res.status(status).json(payload);
+    }
+}
+
+async function handleDeleteReport(req: VercelRequest, res: VercelResponse, origin?: string) {
+    try {
+        const user = authenticate(req as AuthenticatedRequest);
+        const { id } = req.query;
+
+        if (!id || typeof id !== 'string') {
+            setCorsHeaders(res, origin);
+            return res.status(400).json(handleError(new Error('Report ID is required')).payload);
+        }
+
+        const report = await prisma.report.findUnique({ where: { id } });
+        if (!report) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('Report not found')).payload);
+        }
+
+        const userRole = (user.role || '').toLowerCase();
+        if (userRole !== 'admin' && report.userId !== user.id) {
+            setCorsHeaders(res, origin);
+            return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
+        }
+
+        await prisma.report.delete({ where: { id } });
+        setCorsHeaders(res, origin);
+        return res.status(200).json(successResponse({ success: true }, 'Report deleted successfully'));
     } catch (error: any) {
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);

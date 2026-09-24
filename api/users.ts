@@ -2,18 +2,17 @@ import { VercelRequest, VercelResponse } from '@vercel/node';
 import { authenticate, AuthenticatedRequest, requireAdmin, validateRequest } from '../lib/middleware';
 import { successResponse, handleError, setCorsHeaders, safeJsonStringify } from '../lib/response';
 import { uploadImage } from '../lib/cloudinary';
-import { MessageCreateSchema, InvitationCreateSchema } from '../lib/validation';
+import { MessageCreateSchema } from '../lib/validation';
 import prisma from '../lib/prisma';
 import { handleCorsPreflightRequest } from '../lib/cors';
 import { validateEnvironment, validateBase64ImageSize, getPaginationParams, createPaginationMeta } from '../lib/validators';
-import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
+import { BCRYPT_SALT_ROUNDS } from '../lib/utils';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { action, format, userId, id } = req.query;
     const origin = req.headers.origin;
 
-    // Handle CORS preflight
     // Handle CORS preflight
     if (req.method === 'OPTIONS') {
         return handleCorsPreflightRequest(req, res, origin);
@@ -91,7 +90,7 @@ async function handleChangePassword(req: VercelRequest, res: VercelResponse, ori
             return res.status(400).json(handleError(new Error('Password must be at least 8 characters')).payload);
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
         await prisma.user.update({
             where: { id },
@@ -128,16 +127,8 @@ async function handleGetSingle(req: VercelRequest, res: VercelResponse, id: stri
             return res.status(404).json(handleError(new Error('User not found')).payload);
         }
 
-        // Only admin, the user themselves, or Volunteers viewing Gardeners can see details
-        const isSelf = user.id === targetUser.id;
-        const userRole = (user.role || '').toLowerCase();
-        const targetUserRole = (targetUser.role || '').toLowerCase();
-
-        const isAdmin = userRole === 'admin';
-        // Allow Volunteers to view Gardener profiles (for assignment/reports)
-        const isVolunteerViewingGardener = userRole === 'volunteer' && targetUserRole === 'gardener';
-
-        if (!isAdmin && !isSelf && !isVolunteerViewingGardener) {
+        // Allow any authenticated user to view profiles (required for chat, event task assignees, and gardener dashboard displays)
+        if (!user.id) {
             setCorsHeaders(res, origin);
             return res.status(403).json(handleError(new Error('INSUFFICIENT_PERMISSIONS')).payload);
         }
@@ -172,7 +163,17 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
         const where: any = {};
 
         // Role-based visibility logic
-        const currentUserRole = (user.role || '').toLowerCase();
+        let currentUserRole = (user.role || '').toLowerCase();
+
+        if (!currentUserRole && user.id) {
+            const dbUser = await prisma.user.findUnique({
+                where: { id: user.id },
+                select: { role: true }
+            });
+            if (dbUser) {
+                currentUserRole = dbUser.role.toLowerCase();
+            }
+        }
 
         if (currentUserRole === 'volunteer') {
             // Volunteers can only see Admins and the Gardeners they are assigned to
@@ -266,8 +267,10 @@ async function handleList(req: VercelRequest, res: VercelResponse, origin?: stri
             pagination: createPaginationMeta(page, limit, total)
         })));
     } catch (error: any) {
-        console.error('[handleList] Error:', error.message);
-        console.error('[handleList] Query:', JSON.stringify(req.query));
+        if (process.env.NODE_ENV !== 'production') {
+            console.error('[handleList] Error:', error.message);
+            console.error('[handleList] Query:', JSON.stringify(req.query));
+        }
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);
         return res.status(status).json(payload);
@@ -331,7 +334,7 @@ async function handleAdminUpdateUser(req: VercelRequest, res: VercelResponse, or
 
         // Allow admin to set a new password
         if (req.body.password && typeof req.body.password === 'string' && req.body.password.trim().length >= 8) {
-            updateData.password = await bcrypt.hash(req.body.password, 10);
+            updateData.password = await bcrypt.hash(req.body.password, BCRYPT_SALT_ROUNDS);
         }
 
         const updatedUser = await prisma.user.update({
@@ -408,7 +411,9 @@ async function handleAdminDeleteUser(req: VercelRequest, res: VercelResponse, or
         setCorsHeaders(res, origin);
         return res.status(200).json(successResponse({ success: true }, 'User deleted successfully'));
     } catch (error: any) {
-        console.error('[handleAdminDeleteUser] Error:', error.message, error.code);
+        if (process.env.NODE_ENV !== 'production') {
+            console.error('[handleAdminDeleteUser] Error:', error.message, error.code);
+        }
         setCorsHeaders(res, origin);
         if (error.code === 'P2025') {
             return res.status(404).json(handleError(new Error('User not found')).payload);
@@ -616,64 +621,6 @@ async function handleMessages(req: VercelRequest, res: VercelResponse, origin?: 
 
         setCorsHeaders(res, origin);
         return res.status(405).json(handleError(new Error('Method not allowed for messages')).payload);
-    } catch (error: any) {
-        setCorsHeaders(res, origin);
-        const { status, payload } = handleError(error);
-        return res.status(status).json(payload);
-    }
-}
-
-async function handleSystemInvitations(req: VercelRequest, res: VercelResponse, origin?: string) {
-    try {
-        const user = authenticate(req as AuthenticatedRequest);
-        requireAdmin(user);
-
-        if (req.method === 'GET') {
-            const invitations = await prisma.invitation.findMany({
-                include: { sender: { select: { id: true, name: true } } },
-                orderBy: { createdAt: 'desc' }
-            });
-
-            setCorsHeaders(res, origin);
-            return res.status(200).json(successResponse(invitations.map(i => ({ ...i, _id: i.id }))));
-        }
-
-        if (req.method === 'POST') {
-            let { email, role, message } = validateRequest(InvitationCreateSchema, req.body);
-            email = email.toLowerCase();
-            const token = crypto.randomBytes(32).toString('hex');
-            const expiresAt = new Date();
-            expiresAt.setDate(expiresAt.getDate() + 7); // 7 days expiry
-
-            const invitation = await prisma.invitation.create({
-                data: {
-                    email,
-                    role,
-                    message,
-                    token,
-                    sentBy: user.id,
-                    expiresAt
-                }
-            });
-
-            setCorsHeaders(res, origin);
-            return res.status(201).json(successResponse({ ...invitation, _id: invitation.id }, 'Invitation sent successfully'));
-        }
-
-        if (req.method === 'DELETE') {
-            const { id } = req.query;
-            if (!id || typeof id !== 'string') {
-                setCorsHeaders(res, origin);
-                return res.status(400).json(handleError(new Error('Invitation ID is required')).payload);
-            }
-
-            await prisma.invitation.delete({ where: { id } });
-            setCorsHeaders(res, origin);
-            return res.status(200).json(successResponse({ success: true }, 'Invitation revoked successfully'));
-        }
-
-        setCorsHeaders(res, origin);
-        return res.status(405).json(handleError(new Error('Method not allowed')).payload);
     } catch (error: any) {
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);

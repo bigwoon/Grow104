@@ -430,17 +430,17 @@ async function handleMapData(req: VercelRequest, res: VercelResponse, origin?: s
             await Promise.allSettled(geocodePromises);
         }
 
-        // 3. Return only gardens with valid coordinates inside Fort Worth bounding box
-        const ftwGardens = gardens.filter(g => {
+        // 3. Return only gardens with valid geographic coordinates
+        const validGardens = gardens.filter(g => {
             if (g.latitude == null || g.longitude == null) return false;
             const lat = Number(g.latitude);
             const lng = Number(g.longitude);
-            return lat >= 32.50 && lat <= 32.95 && lng >= -97.55 && lng <= -97.05;
+            return !isNaN(lat) && !isNaN(lng) && lat !== 0 && lng !== 0 && lat >= -90 && lat <= 90 && lng >= -180 && lng <= 180;
         });
 
         setCorsHeaders(res, origin);
         res.setHeader('Content-Type', 'application/json');
-        return res.status(200).send(safeJsonStringify(successResponse(ftwGardens.map(transformGarden))));
+        return res.status(200).send(safeJsonStringify(successResponse(validGardens.map(transformGarden))));
     } catch (error: any) {
         console.error('[api/gardens] Error in handleMapData:', {
             query: req.query,

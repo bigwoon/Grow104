@@ -146,10 +146,6 @@
       "destination": "/api/invitations?id=:id"
     },
     {
-      "source": "/api/invitations",
-      "destination": "/api/invitations"
-    },
-    {
       "source": "/api/inventory/requests/:id/status",
       "destination": "/api/requests?type=gardener&id=:id"
     },
@@ -187,10 +183,6 @@
       "source": "/api/(.*)",
       "headers": [
         {
-          "key": "Access-Control-Allow-Origin",
-          "value": "https://www.grow104.org"
-        },
-        {
           "key": "Access-Control-Allow-Credentials",
           "value": "true"
         },
@@ -220,7 +212,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com; connect-src 'self' https://*.vercel.app https://grow104-snowy.vercel.app https://sc-garden-app.vercel.app https://www.grow104.org https://grow104.org http://localhost:*"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: https://res.cloudinary.com; connect-src 'self' https://*.vercel.app https://www.grow104.org https://grow104.org http://localhost:*"
         }
       ]
     }

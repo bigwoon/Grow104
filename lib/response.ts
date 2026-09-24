@@ -2,10 +2,6 @@
  * Get CORS origin based on request
  * Allows production domain and localhost for development
  */
-/**
- * Get CORS origin based on request
- * Allows production domain and localhost for development
- */
 export const getAllowedOrigin = (origin?: string | string[]): string => {
     // Prefer explicit env var, fall back to canonical www form
     const defaultOrigin = process.env.FRONTEND_URL || 'https://www.grow104.org';
@@ -19,10 +15,9 @@ export const getAllowedOrigin = (origin?: string | string[]): string => {
     const normalizedOrigin = checkOrigin.replace(/\/$/, '').toLowerCase();
 
     const allowedOrigins = [
-        'https://www.grow104.org',   // canonical production (with www)
-        'https://grow104.org',        // production (without www)
-        'https://grow104-snowy.vercel.app', // current backend deployment
-        'https://sc-garden-app.vercel.app', // legacy backend fallback
+        'https://www.grow104.org',          // canonical production (with www)
+        'https://grow104.org',              // production (without www)
+        'https://grow104-snowy.vercel.app', // active Vercel backend alias
         'http://localhost:3000',
         'https://localhost:3000',
         'http://localhost:5173',
@@ -42,8 +37,8 @@ export const getAllowedOrigin = (origin?: string | string[]): string => {
         return checkOrigin;
     }
 
-    // Allow Vercel preview deployments
-    if (normalizedOrigin.endsWith('.vercel.app')) {
+    // Allow Grow104 Vercel preview deployments only
+    if (/^https:\/\/grow104(-[a-z0-9_-]+)?\.vercel\.app$/.test(normalizedOrigin)) {
         return checkOrigin;
     }
 
@@ -119,7 +114,15 @@ export const handleError = (error: any) => {
     }
 
     // Business logic errors (404s)
-    if (message === 'GARDEN_NOT_FOUND' || message === 'User not found' || message === 'NO_GARDEN_ASSIGNMENT' || message === 'Notification not found' || message === 'Request not found') {
+    if (
+        message === 'GARDEN_NOT_FOUND' ||
+        message === 'Garden not found' ||
+        message === 'Event not found' ||
+        message === 'User not found' ||
+        message === 'NO_GARDEN_ASSIGNMENT' ||
+        message === 'Notification not found' ||
+        message === 'Request not found'
+    ) {
         return { status: 404, payload: errorResponse(message, 404) };
     }
 
@@ -143,12 +146,14 @@ export const handleError = (error: any) => {
         return { status: 404, payload: errorResponse('Record not found', 404) };
     }
 
-    // Default error
-    console.error('--- UNHANDLED ERROR ---');
-    console.error('Message:', message);
-    console.error('Code:', error.code);
-    console.error('Stack:', error.stack);
-    console.error('-----------------------');
+    // Default error — log to console only in non-production environments
+    if (process.env.NODE_ENV !== 'production') {
+        console.error('--- UNHANDLED ERROR ---');
+        console.error('Message:', message);
+        console.error('Code:', error.code);
+        console.error('Stack:', error.stack);
+        console.error('-----------------------');
+    }
 
     return { status: 500, payload: errorResponse(message || 'Internal server error', 500) };
 };

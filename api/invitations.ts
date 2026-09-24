@@ -68,7 +68,11 @@ async function handleGetInvitationByToken(req: VercelRequest, res: VercelRespons
         }
 
         setCorsHeaders(res, origin);
-        return res.status(200).json(successResponse({ invitation: { ...invitation, _id: invitation.id } }));
+        const transformed = { ...invitation, _id: invitation.id };
+        return res.status(200).json(successResponse({
+            ...transformed,
+            invitation: transformed
+        }));
     } catch (error: any) {
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);

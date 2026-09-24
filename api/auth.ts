@@ -7,7 +7,7 @@ import { successResponse, handleError, setCorsHeaders } from '../lib/response';
 import prisma from '../lib/prisma';
 import { uploadImage } from '../lib/cloudinary';
 import { geocodeAddress } from '../lib/geocode';
-import { createNotification, getAdminIds } from '../lib/utils';
+import { createNotification, getAdminIds, BCRYPT_SALT_ROUNDS } from '../lib/utils';
 import { handleCorsPreflightRequest } from '../lib/cors';
 import { checkRateLimit } from '../lib/rate-limit';
 import { validateBase64ImageSize } from '../lib/validators';
@@ -186,7 +186,7 @@ async function handleSignup(req: VercelRequest, res: VercelResponse, origin?: st
             }
         }
 
-        const hashedPassword = await bcrypt.hash(password, 10);
+        const hashedPassword = await bcrypt.hash(password, BCRYPT_SALT_ROUNDS);
 
         // Upsert user (update if stub exists, else create)
         const user = await prisma.user.upsert({
@@ -294,7 +294,7 @@ async function handleSignup(req: VercelRequest, res: VercelResponse, origin?: st
         }, undefined));
 
     } catch (error: any) {
-        console.error('Signup error:', error);
+        if (process.env.NODE_ENV !== 'production') console.error('Signup error:', error);
 
         // Handle Zod validation errors
         if (error instanceof z.ZodError) {
@@ -390,7 +390,7 @@ async function handleLogin(req: VercelRequest, res: VercelResponse, origin?: str
         }, undefined));
 
     } catch (error: any) {
-        console.error('Login error:', error);
+        if (process.env.NODE_ENV !== 'production') console.error('Login error:', error);
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);
         return res.status(status).json(payload);
@@ -423,8 +423,17 @@ async function handleRefresh(req: VercelRequest, res: VercelResponse, origin?: s
 
         const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as any;
 
+        const dbUser = await prisma.user.findUnique({
+            where: { id: decoded.id }
+        });
+
+        if (!dbUser) {
+            setCorsHeaders(res, origin);
+            return res.status(404).json(handleError(new Error('User not found')).payload);
+        }
+
         const newToken = jwt.sign(
-            { id: decoded.id, email: decoded.email, role: decoded.role },
+            { id: dbUser.id, email: dbUser.email, role: dbUser.role },
             process.env.JWT_SECRET!,
             { expiresIn: '7d' }
         );
@@ -443,7 +452,7 @@ async function handleRefresh(req: VercelRequest, res: VercelResponse, origin?: s
         }, undefined));
 
     } catch (error: any) {
-        console.error('Refresh token error:', error);
+        if (process.env.NODE_ENV !== 'production') console.error('Refresh token error:', error);
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);
         return res.status(status).json(payload);
@@ -495,7 +504,7 @@ async function handleGetMe(req: VercelRequest, res: VercelResponse, origin?: str
         }, undefined));
 
     } catch (error: any) {
-        console.error('Get current user error:', error);
+        if (process.env.NODE_ENV !== 'production') console.error('Get current user error:', error);
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);
         return res.status(status).json(payload);
@@ -521,7 +530,7 @@ async function handleHeartbeat(req: VercelRequest, res: VercelResponse, origin?:
         }, undefined));
 
     } catch (error: any) {
-        console.error('Heartbeat error:', error);
+        if (process.env.NODE_ENV !== 'production') console.error('Heartbeat error:', error);
         setCorsHeaders(res, origin);
         const { status, payload } = handleError(error);
         return res.status(status).json(payload);
@@ -539,8 +548,8 @@ async function handleLogout(req: VercelRequest, res: VercelResponse, origin?: st
         }
     } catch (error) {
         // Continue even if auth fails
-    } finally {
-        setCorsHeaders(res, origin);
-        return res.status(200).json(successResponse({ success: true }, 'Logged out'));
     }
+
+    setCorsHeaders(res, origin);
+    return res.status(200).json(successResponse({ success: true }, 'Logged out'));
 }
