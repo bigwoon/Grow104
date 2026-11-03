@@ -4,8 +4,11 @@ declare global {
     var prisma: PrismaClient | undefined;
 }
 
-// CRITICAL: Configure connection pooling for serverless environments
-// This prevents connection exhaustion with Neon DB
+// CRITICAL: Configure connection pooling for serverless environments.
+// Prisma connects lazily on the first query — do NOT call $connect() at
+// module level in serverless environments. Doing so causes unnecessary
+// cold-start latency and can trigger unhandled promise rejections when the
+// lambda boots before the NeonDB network pool is ready.
 const prisma = global.prisma || new PrismaClient({
     log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
     datasources: {
@@ -20,19 +23,7 @@ if (process.env.NODE_ENV !== 'production') {
     global.prisma = prisma;
 }
 
-// Graceful connection handling
-prisma.$connect()
-    .then(() => {
-        if (process.env.NODE_ENV === 'development') {
-            console.log('✅ Database connected successfully');
-        }
-    })
-    .catch((error) => {
-        console.error('❌ Failed to connect to database:', error.message);
-        // Don't exit in serverless - let individual requests fail gracefully
-    });
-
-// Cleanup on process termination (for local dev)
+// Graceful disconnect on process exit (local dev only — not needed in serverless)
 if (process.env.NODE_ENV !== 'production') {
     process.on('beforeExit', async () => {
         await prisma.$disconnect();

@@ -6,8 +6,14 @@ const REQUIRED_ENV_VARS = [
     'CLOUDINARY_API_KEY',
     'CLOUDINARY_API_SECRET',
     'FRONTEND_URL'
-    // UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN are optional — Redis is used for
-    // caching and rate limiting only, and the app degrades gracefully without it.
+];
+
+// Optional but strongly recommended in production for distributed rate limiting.
+// Without these, rate limiting falls back to per-lambda in-memory Maps, which
+// are ineffective across Vercel's distributed serverless environment.
+const RECOMMENDED_ENV_VARS = [
+    'UPSTASH_REDIS_REST_URL',
+    'UPSTASH_REDIS_REST_TOKEN'
 ];
 
 let validationChecked = false;
@@ -33,6 +39,15 @@ export function validateEnvironment(): { valid: boolean; missing: string[] } {
 
     if (!validationResult.valid) {
         console.error('[ENV] Missing required environment variables:', missing);
+    }
+
+    // Warn about missing optional but strongly recommended vars
+    const missingRecommended = RECOMMENDED_ENV_VARS.filter(key => !process.env[key]);
+    if (missingRecommended.length > 0) {
+        console.warn(
+            '[ENV] ⚠️  Missing recommended env vars (rate limiting will fall back to in-memory):',
+            missingRecommended
+        );
     }
 
     return validationResult;
